@@ -7,6 +7,12 @@ export const ruleTitles = {
   loan: "대출 월 상환액",
 } as const;
 export type Rule = keyof typeof ruleTitles;
+export type EvidenceRef = {
+  source: Candidate["source"];
+  fileName: string;
+  location: string;
+  originalText: string;
+};
 export type Status = "오류" | "확인 필요" | "검증 통과" | "검증 불가";
 export type Calculation = {
   id: string;
@@ -25,6 +31,7 @@ export type Result = {
   title: string;
   status: Status;
   evidence: Candidate[];
+  references?: EvidenceRef[];
   actual: number | null;
   expected: number | null;
   difference: number | null;

@@ -4,7 +4,15 @@ import { Button } from "./ui/button";
 import { newCalculation, rules, ruleTitles } from "../validation/types";
 import type { Calculation, Rule, Status } from "../validation/types";
 import { validateAll } from "../validation/engine";
+import { validatePlanning } from "../planning/engine";
+import { emptyPlanning } from "../planning/types";
+import type { Planning } from "../planning/types";
+import type { EvidenceRef } from "../validation/types";
+import { PlanningEditor } from "./PlanningEditor";
 type Props = {
+  planning?: Planning;
+  references?: EvidenceRef[];
+  onPlanningChange?: (next: Planning) => void;
   items: Candidate[];
   links: Link[];
   calculations: Calculation[];
@@ -19,6 +27,9 @@ const statusClass: Record<Status, string> = {
 };
 /** 선택 범위 설정과 현재 데이터로 계산한 결과를 표시하며 모든 판정의 원본 근거를 연다. */
 export function ResultsView({
+  planning = emptyPlanning(),
+  references = [],
+  onPlanningChange,
   items,
   links,
   calculations,
@@ -29,8 +40,11 @@ export function ResultsView({
     [filter, setFilter] = useState("전체"),
     [addRule, setAddRule] = useState<Rule>("assets");
   const results = useMemo(
-    () => validateAll(items, links, calculations),
-    [items, links, calculations],
+    () => [
+      ...validateAll(items, links, calculations),
+      ...validatePlanning(items, planning),
+    ],
+    [items, links, calculations, planning],
   );
   const visible = results.filter(
     (r) => filter === "전체" || r.status === filter,
@@ -251,6 +265,14 @@ export function ResultsView({
           </Button>
         </div>
       </details>
+      {onPlanningChange && (
+        <PlanningEditor
+          state={planning}
+          items={items}
+          references={references}
+          onChange={onPlanningChange}
+        />
+      )}
       <div className="result-counts">
         {(["오류", "확인 필요", "검증 통과", "검증 불가"] as const).map(
           (status) => (
@@ -300,6 +322,13 @@ export function ResultsView({
                           {c.label}: {c.number} {c.unit}
                           <br />
                           {c.fileName} · {c.location}
+                        </p>
+                      ))}
+                    {r.references
+                      ?.filter((ref) => ref.source === source)
+                      .map((ref, i) => (
+                        <p key={`ref:${i}`}>
+                          {ref.fileName} · {ref.location}
                         </p>
                       ))}
                   </td>
@@ -359,7 +388,16 @@ export function ResultsView({
               </p>
             </article>
           ))}
+          {detail.references?.map((ref, i) => (
+            <article key={`ref:${i}`}>
+              <strong>
+                {ref.source} · {ref.fileName} · {ref.location}
+              </strong>
+              <p className="pre">{ref.originalText}</p>
+            </article>
+          ))}
           <Button
+            disabled={!detail.evidence.length}
             variant="outline"
             onClick={() => onInspect(detail.evidence.map((c) => c.id))}
           >

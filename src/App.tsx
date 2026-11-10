@@ -14,10 +14,19 @@ import { extractWorkbook, extractWord } from "./normalization/extract";
 import { editCandidate, canConfirm } from "./normalization/values";
 import { removeLinks } from "./normalization/links";
 import type { Candidate, Link } from "./normalization/types";
+import type { EvidenceRef } from "./validation/types";
+import { emptyPlanning } from "./planning/types";
+import {
+  workbookReferences,
+  wordReferences,
+  replacePlanningSource,
+} from "./planning/extract";
 /** 원본 추출과 사용자 확인 상태를 관리하며 파일 교체 시 관련 연결을 해제한다. */
 export default function App() {
   const [step, setStep] = useState<"raw" | "review" | "results">("raw");
   const [focusIds, setFocusIds] = useState<string[]>([]);
+  const [planning, setPlanning] = useState(emptyPlanning);
+  const [sourceReferences, setSourceReferences] = useState<EvidenceRef[]>([]);
   const [calculations, setCalculations] = useState<Calculation[]>(() =>
     Object.keys(ruleTitles).map((rule) => newCalculation(rule as Rule, rule)),
   );
@@ -25,9 +34,20 @@ export default function App() {
     items: [],
     links: [],
   });
-  function replaceSource(source: Candidate["source"], next: Candidate[]) {
+  function replaceSource(
+    source: Candidate["source"],
+    next: Candidate[],
+    references: EvidenceRef[] = [],
+  ) {
     const replaced = new Set(
       review.items.filter((c) => c.source === source).map((c) => c.id),
+    );
+    setSourceReferences((prev) => [
+      ...prev.filter((r) => r.source !== source),
+      ...references,
+    ]);
+    setPlanning((prev) =>
+      replacePlanningSource(prev, source, replaced, references),
     );
     setCalculations((prev) =>
       prev.map((s) => ({
@@ -51,6 +71,20 @@ export default function App() {
     }));
   }
   function edit(id: string, patch: Partial<Candidate>) {
+    setPlanning((prev) => ({
+      ...prev,
+      allocations: prev.allocations.map((r) =>
+        r.assetId === id || r.goalId === id || r.candidateIds.includes(id)
+          ? { ...r, confirmed: false }
+          : r,
+      ),
+      funds: prev.funds.map((r) =>
+        r.candidateIds.includes(id) ? { ...r, confirmed: false } : r,
+      ),
+      actions: prev.actions.map((r) =>
+        r.candidateIds.includes(id) ? { ...r, confirmed: false } : r,
+      ),
+    }));
     setCalculations((prev) =>
       prev.map((s) =>
         s.targetId === id || Object.values(s.groups).flat().includes(id)
@@ -168,7 +202,11 @@ export default function App() {
             title="Excel 재무표"
             parse={parseXlsx}
             onData={(data) =>
-              replaceSource("XLSX", data ? extractWorkbook(data) : [])
+              replaceSource(
+                "XLSX",
+                data ? extractWorkbook(data) : [],
+                data ? workbookReferences(data) : [],
+              )
             }
           >
             {(data) => <WorkbookView data={data} />}
@@ -178,7 +216,11 @@ export default function App() {
             title="Word 보고서"
             parse={parseDocx}
             onData={(data) =>
-              replaceSource("DOCX", data ? extractWord(data) : [])
+              replaceSource(
+                "DOCX",
+                data ? extractWord(data) : [],
+                data ? wordReferences(data) : [],
+              )
             }
           >
             {(data) => <WordView data={data} />}
@@ -210,6 +252,9 @@ export default function App() {
         )}
         {step === "results" && (
           <ResultsView
+            planning={planning}
+            references={sourceReferences}
+            onPlanningChange={setPlanning}
             items={review.items}
             links={review.links}
             calculations={calculations}
