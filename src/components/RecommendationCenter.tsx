@@ -197,6 +197,7 @@ export function RecommendationDetail({
     .map((id) => items.find((c) => c.id === id))
     .filter((c): c is Candidate => !!c);
   const valid =
+    !r.scopeIssues?.length &&
     members.length > 0 &&
     members.length === r.candidateIds.length &&
     members.every(canConfirm) &&

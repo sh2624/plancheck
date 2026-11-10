@@ -72,7 +72,7 @@ export function InlineReview({
               {members
                 .map(
                   (c) =>
-                    `${c.source} 기준일 ${c.asOf || "미확인"}, 시나리오 ${c.scenario || "미확인"}, ${c.certainty}`,
+                    `${c.source} 기준일 ${c.asOf || "미확인"}, 시나리오 ${c.scenario || "미확인"}, 적용 기간 ${c.period || "미확인"}, ${c.certainty}`,
                 )
                 .join(" / ")}
               . 아래 답변은 두 항목에 적용되며 원문은 보존됩니다.

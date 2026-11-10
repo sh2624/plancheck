@@ -3,6 +3,7 @@ import type { Calculation } from "../validation/types";
 import { rules } from "../validation/types";
 import { canConfirm } from "../normalization/values";
 import type { Recommendation } from "./types";
+import { assessRelationship } from "../normalization/relationships";
 export type ReviewState = {
   items: Candidate[];
   links: Link[];
@@ -14,6 +15,7 @@ export function applyRecommendation(
   r: Recommendation,
   approve: boolean,
 ): ReviewState {
+  if (approve && r.scopeIssues?.length) return state;
   const selected = r.candidateIds.map((id) =>
     state.items.find((c) => c.id === id),
   );
@@ -38,6 +40,7 @@ export function applyRecommendation(
     const x = selected.find((c) => c?.id === r.link!.xlsxId),
       d = selected.find((c) => c?.id === r.link!.docxId);
     if (x?.source !== "XLSX" || d?.source !== "DOCX") return state;
+    if (x.field !== d.field || assessRelationship(x, d).blocked) return state;
     if (!links.some((l) => l.xlsxId === x.id && l.docxId === d.id))
       links = [
         ...links,

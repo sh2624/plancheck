@@ -80,7 +80,8 @@ function calculations(items: Candidate[]): Recommendation[] {
       const spec = newCalculation(rule, `recommended:${rule}:${target.id}`);
       spec.targetId = target.id;
       const risks: string[] = [],
-        missing: string[] = [];
+        missing: string[] = [],
+        scopeIssues: string[] = [];
       if (rule === "assets")
         spec.groups.parts = candidates
           .filter(
@@ -113,10 +114,33 @@ function calculations(items: Candidate[]): Recommendation[] {
           ...constituent(candidates, "variableExpense"),
           ...candidates.filter((c) => c.field === "loanPayment"),
         ].map((c) => c.id);
+        const inclusive = candidates.filter(
+          (c) =>
+            ["fixedExpense", "variableExpense"].includes(c.field) &&
+            /생활비\s*합계|총지출|지출\s*합계/.test(c.label) &&
+            /고정.*변동/.test(c.label) &&
+            /부채|상환/.test(c.label),
+        );
+        if (inclusive.length === 1) spec.groups.expense = [inclusive[0].id];
+        if (inclusive.length > 1)
+          scopeIssues.push(
+            "지출 총합 후보가 여러 개입니다. 구성 범위를 선택하세요.",
+          );
+        if (
+          candidates.some(
+            (c) =>
+              ["deposit", "etf", "pension"].includes(c.field) &&
+              /^\s*저축\s*[·/ㆍ-]?\s*투자\s*[|·:]/.test(c.originalText),
+          )
+        )
+          scopeIssues.push(
+            "저축 행의 일부 값이 자산 유형으로 추출됐습니다. 항목 유형과 누락된 저축 구성을 확인하세요.",
+          );
         spec.groups.savings = constituent(candidates, "savings").map(
           (c) => c.id,
         );
         risks.push("월 지출과 저축의 누락·소계 중복 여부를 확인하세요.");
+        missing.push(...scopeIssues);
       }
       if (rule === "loan") {
         const entity = loanIdentity(target);
@@ -203,13 +227,22 @@ function calculations(items: Candidate[]): Recommendation[] {
         confidence: missing.length ? "정보 부족" : "구조 일치",
         primary: rule !== "loan" || missing.length < 3,
         references: [],
+        scopeIssues,
       });
     }
   return output;
 }
 /** 문서 간 반복 후보를 유지하되 대표 후보를 유형·대출 명칭·자료 구조로 우선 표시한다. */
-function cross(items: Candidate[], links: Link[]): Recommendation[] {
-  const result: Recommendation[] = suggestLinks(items, []).flatMap((pair) => {
+function cross(
+  items: Candidate[],
+  links: Link[],
+  includeIncompatible = false,
+): Recommendation[] {
+  const result: Recommendation[] = suggestLinks(
+    items,
+    [],
+    includeIncompatible,
+  ).flatMap((pair) => {
     const a = items.find((c) => c.id === pair.xlsxId)!,
       b = items.find((c) => c.id === pair.docxId)!;
     if (party(a) && party(b) && party(a) !== party(b)) return [];
@@ -350,9 +383,10 @@ export function recommend(
   links: Link[],
   planning: Planning,
   references: EvidenceRef[],
+  includeIncompatible = false,
 ): Recommendation[] {
   const output = [
-    ...cross(items, links),
+    ...cross(items, links, includeIncompatible),
     ...calculations(items),
     ...allocationRecommendations(items, references),
   ];

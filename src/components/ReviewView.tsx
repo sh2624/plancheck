@@ -6,6 +6,7 @@ import { canConfirm } from "../normalization/values";
 import { suggestLinks } from "../normalization/links";
 import { candidateValue } from "../presentation/workflow";
 import { formatFinancial } from "../presentation/format";
+import { assessRelationship } from "../normalization/relationships";
 type Props = {
   coreIds?: string[];
   reasons?: { ids: string[]; reason: string; title: string }[];
@@ -74,6 +75,17 @@ export function ReviewView({
       Math.max(0, Math.ceil(suggestions.length / 20) - 1),
     );
   const find = (id: string) => items.find((c) => c.id === id);
+  const selectedX = find(a),
+    selectedD = find(b),
+    linkIssues =
+      selectedX && selectedD
+        ? [
+            ...(selectedX.field !== selectedD.field
+              ? ["서로 다른 항목 유형입니다."]
+              : []),
+            ...assessRelationship(selectedX, selectedD).reasons,
+          ]
+        : [];
   const describe = (c: Candidate | undefined) =>
     c
       ? `${c.label} · ${candidateValue(c)} · ${c.location} · ${c.asOf || "기준일 미확인"} · ${c.period || "기간 미확인"} · ${c.scenario || "시나리오 미확인"}`
@@ -425,13 +437,20 @@ export function ReviewView({
           </label>
           <Button
             disabled={
-              !active.some((c) => c.id === a) || !active.some((c) => c.id === b)
+              !active.some((c) => c.id === a) ||
+              !active.some((c) => c.id === b) ||
+              linkIssues.length > 0
             }
             onClick={() => onLink(a, b)}
           >
             선택 항목 연결 승인
           </Button>
         </div>
+        {linkIssues.length > 0 && (
+          <p className="warning">
+            {linkIssues.join(" ")} 항목과 범위를 수정한 뒤 연결하세요.
+          </p>
+        )}
         <details>
           <summary>연결 제안 {suggestions.length}개</summary>
           {suggestions.slice(linkIndex * 20, (linkIndex + 1) * 20).map((s) => (

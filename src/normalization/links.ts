@@ -1,5 +1,6 @@
 ﻿import type { Candidate, Link } from "./types";
 import { compatibleUnit } from "./values";
+import { assessRelationship } from "./relationships";
 /** 합계 항목은 유형으로, 세부 항목은 명칭의 공통 어휘로 연결 범위를 좁힌다. */
 function similarName(a: Candidate, b: Candidate) {
   if (
@@ -26,7 +27,11 @@ function similarName(a: Candidate, b: Candidate) {
   );
 }
 /** 다른 금액도 연결 후보로 유지한다. 날짜·기간·시나리오 차이는 별도 표시한다. */
-export function suggestLinks(items: Candidate[], links: Link[]) {
+export function suggestLinks(
+  items: Candidate[],
+  links: Link[],
+  includeIncompatible = false,
+) {
   const xlsx = items.filter((c) => c.source === "XLSX" && !c.excluded);
   const docx = items.filter((c) => c.source === "DOCX" && !c.excluded);
   return xlsx.flatMap((a) =>
@@ -38,6 +43,7 @@ export function suggestLinks(items: Candidate[], links: Link[]) {
           compatibleUnit(a.field, a.unit) &&
           compatibleUnit(b.field, b.unit) &&
           similarName(a, b) &&
+          (includeIncompatible || !assessRelationship(a, b).blocked) &&
           (!/loan/.test(a.field) ||
             (/학자금/.test(a.label) === /학자금/.test(b.label) &&
               /신용/.test(a.label) === /신용/.test(b.label))) &&

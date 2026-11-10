@@ -24,7 +24,7 @@ test("인라인 예·아니요·미확인과 원본 편집이 실제 판정·연
   await page.getByLabel(/검토할 Excel/).setInputFiles(xlsx!);
   await page.getByLabel(/검토할 Word/).setInputFiles(docx!);
   await page.getByRole("button", { name: "검사 시작", exact: true }).click();
-  let card = creditIn(page, "수치 불일치 및 확인 필요");
+  let card = creditIn(page, "우선 검토");
   await expect(card).toBeVisible();
   await expect(card.locator(".finding-values")).toContainText("7.5%");
   await expect(card.locator(".finding-values")).toContainText("6.5%");
@@ -36,7 +36,7 @@ test("인라인 예·아니요·미확인과 원본 편집이 실제 판정·연
     .getByLabel("아니요, 다른 조건입니다.", { exact: true })
     .check();
   await selected(page).getByRole("button", { name: "확인 내용 적용" }).click();
-  card = creditIn(page, "검증 대상이지만 정보 부족으로 보류");
+  card = creditIn(page, "상세 분석 기록");
   await expect(card).toContainText("다른 조건 · 보류");
   await expect(card).toContainText("1.0%p");
   await expect(panel(page)).toContainText("확정 오류 0");
@@ -62,7 +62,7 @@ test("인라인 예·아니요·미확인과 원본 편집이 실제 판정·연
     .fill("원문을 같은 기준으로 확인한 시연");
   await selected(page).getByRole("button", { name: "확인 내용 적용" }).click();
   card = page
-    .getByRole("region", { name: "수치 불일치 및 확인 필요", exact: true })
+    .getByRole("region", { name: "우선 검토", exact: true })
     .locator(".finding")
     .filter({
       has: page.getByRole("heading", { name: /신용대출 금리.*추가 확인/ }),
@@ -80,7 +80,7 @@ test("인라인 예·아니요·미확인과 원본 편집이 실제 판정·연
   await selected(page).getByRole("checkbox").check();
   await selected(page).getByRole("button", { name: "확인 내용 적용" }).click();
   card = page
-    .getByRole("region", { name: "확정 오류", exact: true })
+    .getByRole("region", { name: "우선 검토", exact: true })
     .locator(".finding")
     .filter({
       has: page.getByRole("heading", {

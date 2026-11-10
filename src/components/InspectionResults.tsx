@@ -15,6 +15,13 @@ import { candidateValue } from "../presentation/workflow";
 import { RecommendationDetail } from "./RecommendationCenter";
 import { InlineReview } from "./InlineReview";
 import { Button } from "./ui/button";
+import {
+  reviewQuality,
+  filterQuality,
+  contextMismatch,
+  qualityTiers,
+} from "../inspection/quality";
+import { fieldLabels } from "../normalization/types";
 const kinds = {
   CALC: "계산",
   CROSS: "문서 간 비교",
@@ -53,13 +60,17 @@ function explanation(f: ReviewedFinding) {
       : "숫자만으로 동일 항목을 확정하지 않습니다. 관계와 적용 기준을 확인해 주세요."
     : "추천된 구성과 원문 조건을 바탕으로 한 후보입니다. 필요한 범위와 조건을 확인해 주세요.";
 }
-/** 결과를 네 영역으로 나누고 공유 원본 후보를 모두 보존하며 해당 행에서 검토한다. */
+/** 독립적인 우선 발견을 먼저 보여주고 추가·파생·보류 기록도 근거별로 유지한다. */
 export function InspectionResults(props: Props) {
   const { findings, started, onInspect } = props;
   const [kind, setKind] = useState("전체"),
     [expandRelated, setExpandRelated] = useState(false),
     [selected, setSelected] = useState(""),
-    [complex, setComplex] = useState(false);
+    [complex, setComplex] = useState(false),
+    [field, setField] = useState("전체"),
+    [showAdditional, setShowAdditional] = useState(false),
+    [showRecords, setShowRecords] = useState(false),
+    [followId, setFollowId] = useState("");
   const detailRef = useRef<HTMLElement>(null),
     rootRef = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -68,10 +79,21 @@ export function InspectionResults(props: Props) {
       detailRef.current?.focus();
     }
   }, [selected]);
-  const filtered = findings.filter((f) => kind === "전체" || f.kind === kind),
-    sections = groupFindings(filtered);
+  const quality = reviewQuality(findings),
+    filtered = filterQuality(quality, field, kind),
+    qualityMap = new Map(quality.map((e) => [e.finding.id, e])),
+    followTier = quality.find((e) =>
+      e.occurrences.some((f) => f.id === followId),
+    )?.tier;
+  const tierEntries = (tier: string) => filtered.filter((e) => e.tier === tier);
+  const fields: string[] = [
+    ...new Set<string>(
+      quality.map((e) => e.finding.result.evidence[0]?.field ?? "planning"),
+    ),
+  ];
   function close(id: string) {
     setSelected("");
+    setFollowId(id);
     requestAnimationFrame(() =>
       Array.from(
         rootRef.current?.querySelectorAll<HTMLElement>(".finding") ?? [],
@@ -82,7 +104,8 @@ export function InspectionResults(props: Props) {
   }
   function card(f: ReviewedFinding) {
     const r = f.approved ?? f.result,
-      section = findingSection(f);
+      section = findingSection(f),
+      entry = qualityMap.get(f.id)!;
     const status =
       f.decision?.choice === "different"
         ? "다른 조건 · 보류"
@@ -94,12 +117,22 @@ export function InspectionResults(props: Props) {
               ? "정보 부족 · 보류"
               : "자동 발견 · 확인 필요";
     return (
-      <article className="finding" data-finding={f.id} key={f.id} tabIndex={-1}>
+      <article
+        className="finding"
+        data-finding={f.id}
+        data-tier={entry.tier}
+        key={f.id}
+        tabIndex={-1}
+      >
         <div className="finding-heading">
           <h3>
-            {!f.approved && f.kind === "PLAN"
-              ? `${r.title.replace(/^(조건부 금액|제안·실행 비교|대응 계획 필요) · /, "")} — ${f.title}`
-              : f.title}
+            {f.relationship?.blocked
+              ? "자동 연결에서 제외한 원본 기록"
+              : !f.approved && contextMismatch(f)
+                ? `${fieldLabels[r.evidence[0]?.field ?? "unknown"]} · 적용 기준이 다른 비교 기록`
+                : !f.approved && f.kind === "PLAN"
+                  ? `${r.title.replace(/^(조건부 금액|제안·실행 비교|대응 계획 필요) · /, "")} — ${f.title}`
+                  : f.title}
           </h3>
           <span
             className={
@@ -133,7 +166,7 @@ export function InspectionResults(props: Props) {
               : `원문 금액 후보 ${formatFinancial(r.actual, r.unit)}`}
           </p>
         )}
-        {r.difference !== null && (
+        {r.difference !== null && (!contextMismatch(f) || !!f.decision) && (
           <p className="finding-comparison">
             {f.kind === "CROSS" ? "두 값의 차이" : "문서값과 계산값 차이"}:{" "}
             <strong>
@@ -148,17 +181,35 @@ export function InspectionResults(props: Props) {
             )}
           </p>
         )}
-        <p className="finding-description">{explanation(f)}</p>
+        <p className="finding-description">
+          {!f.decision &&
+          !f.approved &&
+          (f.relationship?.blocked || contextMismatch(f))
+            ? entry.reasons[0]
+            : explanation(f)}
+        </p>
+        {entry.supportCount > 0 && (
+          <p className="finding-support">
+            같은 발견을 지지하는 별도 원본 {entry.supportCount}건 · 상세 분석
+            기록에서 확인할 수 있습니다.
+          </p>
+        )}
         <div className="finding-actions">
           <Button
             onClick={() => {
-              if (f.recommendation) {
+              if (f.relationship?.blocked) {
+                onInspect(r.evidence.map((c) => c.id));
+              } else if (f.recommendation) {
                 setSelected(f.id);
                 setComplex(!f.recommendation.link);
               } else props.onPrepare(r);
             }}
           >
-            {f.approved ? "확인 내용 수정" : "이 항목 검토"}
+            {f.relationship?.blocked
+              ? "원본 항목 확인"
+              : f.approved
+                ? "확인 내용 수정"
+                : "이 항목 검토"}
           </Button>
         </div>
         {selected === f.id && f.recommendation && (
@@ -204,6 +255,16 @@ export function InspectionResults(props: Props) {
         )}
         <details className="finding-proof">
           <summary>판단 근거 보기</summary>
+          <p>
+            검토 분류: {entry.tier} · {entry.reasons.join(" ")}
+          </p>
+          {entry.occurrences.length > 1 && (
+            <p>
+              같은 원본 쌍·관계·근거의 완전 중복 {entry.occurrences.length}건을
+              합쳤습니다. 기록 ID:{" "}
+              {entry.occurrences.map((f) => f.id).join(", ")}
+            </p>
+          )}
           <p className="pre">{r.basis}</p>
           {r.evidence.map((c) => (
             <div className="finding-evidence" key={c.id}>
@@ -264,6 +325,32 @@ export function InspectionResults(props: Props) {
         <Button onClick={props.onStart}>검사 시작 화면으로</Button>
       </section>
     );
+  function grouped(tier: string) {
+    const entries = tierEntries(tier),
+      groups = groupFindings(entries.map((e) => e.finding)).flatMap(
+        (s) => s.groups,
+      );
+    if (!entries.length)
+      return <p className="section-empty">이 범위에 표시할 결과가 없습니다.</p>;
+    return groups.map((group) => (
+      <div className="finding-group" key={group.map((f) => f.id).join("|")}>
+        {card(group[0])}
+        {group.length > 1 && (
+          <details
+            className="related-findings"
+            open={
+              expandRelated || group.slice(1).some((f) => f.id === followId)
+            }
+          >
+            <summary>
+              공유 원본의 추가 기록 {group.length - 1}건 · 개별 근거 유지
+            </summary>
+            {group.slice(1).map(card)}
+          </details>
+        )}
+      </div>
+    ));
+  }
   return (
     <section
       ref={rootRef}
@@ -272,95 +359,142 @@ export function InspectionResults(props: Props) {
     >
       <div className="inspection-heading">
         <h2>검사 결과</h2>
-        <span>자동 발견과 사용자 확인 후 판정을 구분합니다</span>
+        <span>자동 발견과 확정 오류를 구분합니다</span>
       </div>
       <div className="inspection-counts">
         <strong>
           확정 오류{" "}
-          {
-            findings.filter((f) => findingSection(f) === resultSections[0])
-              .length
-          }
+          {quality.filter((e) => e.finding.approved?.status === "오류").length}
         </strong>
         <span>
-          수치 불일치 및 확인 필요{" "}
-          {
-            findings.filter((f) => findingSection(f) === resultSections[1])
-              .length
-          }
+          우선 검토 {quality.filter((e) => e.tier === qualityTiers[0]).length}개
         </span>
         <span>
-          검증 통과{" "}
+          자동 수치 차이 후보{" "}
           {
-            findings.filter((f) => findingSection(f) === resultSections[2])
-              .length
+            quality.filter(
+              (e) =>
+                !e.finding.approved &&
+                e.finding.signal === "수치 차이" &&
+                !e.finding.relationship?.blocked &&
+                !contextMismatch(e.finding),
+            ).length
           }
-        </span>
-        <span>
-          정보 부족·조건 보류{" "}
-          {
-            findings.filter((f) => findingSection(f) === resultSections[3])
-              .length
-          }
+          건 <small>반복 원본 포함</small>
         </span>
       </div>
-      <p className="inspection-coverage">
-        자동 발견은 승인이 아닙니다. 모든 후보를 보존하며 같은 원본을 공유하는
-        결과는 추가 후보로 묶습니다. 정보 부족은 검사 실패나 정상 판정이
-        아닙니다.
-      </p>
       <div className="inspection-filters">
         <label>
-          오류 유형
-          <select value={kind} onChange={(e) => setKind(e.target.value)}>
-            <option value="전체">전체 유형</option>
-            {Object.entries(kinds).map(([key, label]) => (
+          재무 항목
+          <select
+            aria-label="재무 항목"
+            value={field}
+            onChange={(e) => {
+              setField(e.target.value);
+              setFollowId("");
+            }}
+          >
+            <option value="전체">전체 항목</option>
+            {fields.map((key) => (
               <option key={key} value={key}>
-                {label} ({findings.filter((f) => f.kind === key).length})
+                {key === "planning"
+                  ? "계획·조건부 금액"
+                  : fieldLabels[key as keyof typeof fieldLabels]}
               </option>
             ))}
           </select>
         </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={expandRelated}
-            onChange={(e) => setExpandRelated(e.target.checked)}
-          />
-          같은 원본의 추가 후보 모두 펼치기
-        </label>
+        <details className="quality-filter-options">
+          <summary>추가 필터</summary>
+          <label>
+            오류 유형
+            <select
+              aria-label="오류 유형"
+              value={kind}
+              onChange={(e) => setKind(e.target.value)}
+            >
+              <option value="전체">전체 유형</option>
+              {Object.entries(kinds).map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={expandRelated}
+              onChange={(e) => setExpandRelated(e.target.checked)}
+            />
+            공유 원본 기록 모두 펼치기
+          </label>
+        </details>
         <span>
-          {filtered.length}개 결과 ·{" "}
-          {sections.reduce((n, s) => n + s.groups.length, 0)}개 묶음
+          {filtered.length}개 분석 기록 · 전체 {quality.length}개
+          {findings.length > quality.length &&
+            ` · 완전 중복 ${findings.length - quality.length}건 합침`}
         </span>
       </div>
-      {sections.map(({ section, count, groups }) => (
-        <section key={section} className="finding-section" aria-label={section}>
-          <h2>
-            {section} <span>{count}건</span>
-          </h2>
-          {!count && (
-            <p className="section-empty">이 영역에 표시할 결과가 없습니다.</p>
-          )}
-          {groups.map((group) => (
-            <div
-              className="finding-group"
-              key={group.map((f) => f.id).join("|")}
-            >
-              {card(group[0])}
-              {group.length > 1 && (
-                <details className="related-findings" open={expandRelated}>
-                  <summary>
-                    같은 원본을 사용하는 추가 후보 {group.length - 1}건 · 개별
-                    근거 유지
-                  </summary>
-                  {group.slice(1).map(card)}
-                </details>
-              )}
-            </div>
-          ))}
+      <section
+        className="finding-section quality-priority"
+        aria-label="우선 검토"
+      >
+        <h2>
+          우선 검토{" "}
+          <span>{tierEntries(qualityTiers[0]).length}개 독립 발견</span>
+        </h2>
+        <p className="quality-caption">
+          핵심 항목과 원본 관계가 명확한 차이부터 확인하세요. 금액 크기로
+          정렬하지 않습니다.
+        </p>
+        {!tierEntries(qualityTiers[0]).length && (
+          <p className="section-empty">
+            우선 검토할 독립 발견이 없습니다. 추가 검토와 상세 분석 기록을
+            확인하세요. 정상 판정이라는 뜻은 아닙니다.
+          </p>
+        )}
+        {tierEntries(qualityTiers[0]).map((e) => card(e.finding))}
+      </section>
+      <details
+        className="quality-extra"
+        open={showAdditional || followTier === qualityTiers[1]}
+        onToggle={(e) => {
+          setShowAdditional(e.currentTarget.open);
+          if (!e.currentTarget.open) setFollowId("");
+        }}
+      >
+        <summary>
+          추가 검토{" "}
+          <span>
+            {tierEntries(qualityTiers[1]).length}건 · 연결·범위·기간 확인
+          </span>
+        </summary>
+        <section aria-label="추가 검토">{grouped(qualityTiers[1])}</section>
+      </details>
+      <details
+        className="quality-records"
+        open={showRecords || followTier === qualityTiers[2]}
+        onToggle={(e) => {
+          setShowRecords(e.currentTarget.open);
+          if (!e.currentTarget.open) setFollowId("");
+        }}
+      >
+        <summary>
+          상세 분석 기록{" "}
+          <span>
+            {tierEntries(qualityTiers[2]).length}건 · 반복·조건 차이·보류·통과
+            기록
+          </span>
+        </summary>
+        <section aria-label="상세 분석 기록">
+          <p className="quality-caption">
+            원본과 개별 근거를 모두 보존합니다. 부적합한 연결은 비교에서
+            제외했으며, 보류는 통과가 아닙니다.
+          </p>
+          {grouped(qualityTiers[2])}
         </section>
-      ))}
+      </details>
     </section>
   );
 }

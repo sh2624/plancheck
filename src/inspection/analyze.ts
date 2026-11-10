@@ -1,5 +1,6 @@
 import type { Candidate, Link } from "../normalization/types";
 import type { Calculation, EvidenceRef, Result } from "../validation/types";
+import { ruleTitles } from "../validation/types";
 import type { Planning } from "../planning/types";
 import {
   discoverCalculation,
@@ -13,7 +14,12 @@ import { loanIdentity } from "../recommendations/recommend";
 import { fieldLabels } from "../normalization/types";
 import { presentResult } from "../presentation/results";
 import { formatFinancial } from "../presentation/format";
+import {
+  assessRelationship,
+  type RelationshipAssessment,
+} from "../normalization/relationships";
 export type Finding = {
+  relationship?: RelationshipAssessment;
   id: string;
   kind: Recommendation["kind"];
   title: string;
@@ -34,7 +40,8 @@ export type InspectionInput = {
 /** 원본과 승인 상태를 변경하지 않고 추천 관계를 분석해 참고 후보와 확정 검증을 구분한다. */
 export function inspectDocuments(input: InspectionInput): Finding[] {
   const { items, links, calculations, planning, references } = input;
-  const suggestions = recommend(items, links, planning, references);
+  // 부적합 관계도 분석 기록으로 남기되 비교 엔진이나 승인 후보에는 전달하지 않는다.
+  const suggestions = recommend(items, links, planning, references, true);
   const final = [
     ...validateAll(items, links, calculations),
     ...validatePlanning(items, planning),
@@ -140,15 +147,59 @@ export function inspectDocuments(input: InspectionInput): Finding[] {
     });
   }
   for (const rec of suggestions) {
-    if (rec.link)
-      append(discoverCross(items, [{ id: rec.id, ...rec.link }])[0], rec);
-    else if (rec.calculation)
+    if (rec.link) {
+      const pair = rec.candidateIds.map((id) =>
+        items.find((c) => c.id === id)!,
+      );
+      const relationship = assessRelationship(pair[0], pair[1]);
+      if (relationship.blocked) {
+        const r: Result = {
+          id: rec.id,
+          code: "CROSS_VALUE",
+          title: "연결 범위 확인",
+          status: "검증 불가",
+          evidence: pair,
+          actual: null,
+          expected: null,
+          difference: null,
+          unit: "",
+          basis: relationship.reasons.join(" "),
+          needs: relationship.reasons,
+        };
+        append(r);
+        Object.assign(out[out.length - 1], {
+          id: rec.id,
+          title: "서로 다른 항목·범위의 연결은 비교에서 제외했습니다",
+          relationship,
+          questions: relationship.reasons,
+          primary: false,
+        });
+      } else {
+        append(discoverCross(items, [{ id: rec.id, ...rec.link }])[0], rec);
+        out[out.length - 1].relationship = relationship;
+      }
+    } else if (rec.calculation)
       append(
-        discoverCalculation(
-          items,
-          calculations.find((c) => c.id === rec.calculation!.id) ??
-            rec.calculation,
-        ),
+        rec.scopeIssues?.length
+          ? {
+              id: `calc:${rec.calculation.id}`,
+              code: `CALC_${rec.calculation.rule.toUpperCase()}`,
+              title: ruleTitles[rec.calculation.rule],
+              status: "검증 불가",
+              evidence: items.filter((c) => rec.candidateIds.includes(c.id)),
+              actual: null,
+              expected: null,
+              difference: null,
+              unit: "원",
+              basis:
+                "추천 구성에 명확한 범위·분류 문제가 있어 자동 계산을 보류합니다.",
+              needs: rec.scopeIssues,
+            }
+          : discoverCalculation(
+              items,
+              calculations.find((c) => c.id === rec.calculation!.id) ??
+                rec.calculation,
+            ),
         rec,
       );
   }

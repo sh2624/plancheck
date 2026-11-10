@@ -36,6 +36,7 @@ import { validatePlanning } from "./planning/engine";
 import { presentResult } from "./presentation/results";
 import { inspectDocuments } from "./inspection/analyze";
 import { InspectionResults } from "./components/InspectionResults";
+import { assessRelationship } from "./normalization/relationships";
 import {
   applyInlineReview,
   reviewFingerprint,
@@ -418,7 +419,13 @@ export default function App() {
         y = prev.items.find(
           (c) => c.id === b && !c.excluded && c.source === "DOCX",
         );
-      if (!x || !y || prev.links.some((l) => l.xlsxId === a && l.docxId === b))
+      if (
+        !x ||
+        !y ||
+        x.field !== y.field ||
+        assessRelationship(x, y).blocked ||
+        prev.links.some((l) => l.xlsxId === a && l.docxId === b)
+      )
         return prev;
       return {
         ...prev,

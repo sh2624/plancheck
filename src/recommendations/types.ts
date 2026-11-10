@@ -2,6 +2,7 @@
 import type { Calculation, EvidenceRef } from "../validation/types";
 import type { Allocation } from "../planning/types";
 export type Recommendation = {
+  scopeIssues?: string[];
   reviewed?: boolean;
   id: string;
   kind: "CALC" | "CROSS" | "ALLOC" | "PLAN";

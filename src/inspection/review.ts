@@ -6,6 +6,7 @@ import {
 } from "../recommendations/apply";
 import type { Recommendation } from "../recommendations/types";
 import { loanIdentity } from "../recommendations/recommend";
+import { assessRelationship } from "../normalization/relationships";
 export type ReviewChoice = "same" | "different" | "unknown";
 export type InlineAnswers = {
   asOf?: string;
@@ -127,6 +128,7 @@ export function applyInlineReview(
     pair[0].source !== "XLSX" ||
     pair[1].source !== "DOCX" ||
     pair[0].field !== pair[1].field ||
+    assessRelationship(pair[0], pair[1]).blocked ||
     pair.some(
       (c) =>
         c.field.startsWith("loan") &&

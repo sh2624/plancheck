@@ -1228,3 +1228,81 @@ main {
     flex-wrap: wrap;
   }
 }
+
+.quality-caption {
+  margin: 0;
+  padding: 12px 24px;
+  color: #526174;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.quality-priority > h2 {
+  background: transparent;
+  border-top: 0;
+}
+.quality-extra,
+.quality-records {
+  border-top: 1px solid #dce1e7;
+  margin-top: 16px;
+}
+.quality-extra > summary,
+.quality-records > summary {
+  padding: 18px 24px;
+  color: #172b43;
+  font-size: 16px;
+  font-weight: 600;
+}
+.quality-extra > summary > span,
+.quality-records > summary > span {
+  font-size: 13px;
+  font-weight: 400;
+  color: #526174;
+  margin-left: 12px;
+}
+.quality-filter-options {
+  font-size: 13px;
+}
+.quality-filter-options > summary {
+  color: #526174;
+}
+.quality-filter-options[open] > label {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0;
+}
+.finding-description {
+  font-size: 14px;
+  line-height: 1.75;
+}
+.finding-heading h3 {
+  font-size: 17px;
+}
+.finding-values strong {
+  font-size: 20px;
+}
+.finding-support {
+  color: #526174;
+  font-size: 12px;
+  margin: 8px 0;
+}
+.finding[data-tier="상세 분석 기록"] {
+  padding-block: 16px;
+}
+.finding[data-tier="상세 분석 기록"] .finding-values strong {
+  font-size: 16px;
+}
+.finding[data-tier="상세 분석 기록"] .finding-heading h3 {
+  font-size: 15px;
+}
+@media (max-width: 800px) {
+  .quality-caption,
+  .quality-extra > summary,
+  .quality-records > summary {
+    padding-inline: 16px;
+  }
+  .quality-extra > summary > span,
+  .quality-records > summary > span {
+    display: block;
+    margin: 4px 0 0;
+  }
+}
