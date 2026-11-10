@@ -7,9 +7,16 @@ type Props<T> = {
   title: string;
   parse: (data: ArrayBuffer, name: string) => Promise<T>;
   children: (data: T) => React.ReactNode;
+  onData?: (data: T | undefined) => void;
 };
 /** 파일 변경 시 결과를 즉시 비우고 오래된 비동기 응답을 폐기한다. */
-export function DocumentPanel<T>({ extension, title, parse, children }: Props<T>) {
+export function DocumentPanel<T>({
+  extension,
+  title,
+  parse,
+  children,
+  onData,
+}: Props<T>) {
   const [data, setData] = useState<T>(),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
@@ -19,6 +26,7 @@ export function DocumentPanel<T>({ extension, title, parse, children }: Props<T>
   function reset() {
     generation.current++;
     setData(undefined);
+    onData?.(undefined);
     setError("");
     setName("");
     setBusy(false);
@@ -33,9 +41,15 @@ export function DocumentPanel<T>({ extension, title, parse, children }: Props<T>
       validateFile(file, extension);
       setBusy(true);
       const result = await parse(await file.arrayBuffer(), file.name);
-      if (version === generation.current) setData(result);
+      if (version === generation.current) {
+        setData(result);
+        onData?.(result);
+      }
     } catch (err) {
-      if (version === generation.current) setError(err instanceof Error ? err.message : "문서를 읽을 수 없습니다.");
+      if (version === generation.current)
+        setError(
+          err instanceof Error ? err.message : "문서를 읽을 수 없습니다.",
+        );
     } finally {
       if (version === generation.current) setBusy(false);
     }
@@ -64,7 +78,11 @@ export function DocumentPanel<T>({ extension, title, parse, children }: Props<T>
         {name && (
           <div className="file-line">
             <span>{name}</span>
-            <Button variant="outline" onClick={reset} aria-label={`${title} 초기화`}>
+            <Button
+              variant="outline"
+              onClick={reset}
+              aria-label={`${title} 초기화`}
+            >
               <X size={14} />
               초기화
             </Button>
@@ -85,7 +103,9 @@ export function DocumentPanel<T>({ extension, title, parse, children }: Props<T>
           !error && (
             <div className="empty">
               <p>선택한 문서가 없습니다.</p>
-              <p className="muted">파일을 선택하면 원본 내용과 위치를 표시합니다.</p>
+              <p className="muted">
+                파일을 선택하면 원본 내용과 위치를 표시합니다.
+              </p>
             </div>
           )}
     </section>

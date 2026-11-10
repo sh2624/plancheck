@@ -1,11 +1,82 @@
+﻿import { useState } from "react";
 import { FileCheck2, LockKeyhole } from "lucide-react";
 import { DocumentPanel } from "./components/DocumentPanel";
 import { WorkbookView } from "./components/WorkbookView";
 import { WordView } from "./components/WordView";
+import { ReviewView } from "./components/ReviewView";
+import { Button } from "./components/ui/button";
 import { parseXlsx } from "./parsers/xlsx";
 import { parseDocx } from "./parsers/docx";
-/** 로컬 문서 추출 작업 화면. */
+import { extractWorkbook, extractWord } from "./normalization/extract";
+import { editCandidate, canConfirm } from "./normalization/values";
+import { removeLinks } from "./normalization/links";
+import type { Candidate, Link } from "./normalization/types";
+/** 원본 추출과 사용자 확인 상태를 관리하며 파일 교체 시 관련 연결을 해제한다. */
 export default function App() {
+  const [step, setStep] = useState<"raw" | "review">("raw");
+  const [review, setReview] = useState<{ items: Candidate[]; links: Link[] }>({
+    items: [],
+    links: [],
+  });
+  function replaceSource(source: Candidate["source"], next: Candidate[]) {
+    setReview((prev) => ({
+      items: [...prev.items.filter((c) => c.source !== source), ...next],
+      links: removeLinks(
+        prev.links,
+        new Set(prev.items.filter((c) => c.source === source).map((c) => c.id)),
+      ),
+    }));
+  }
+  function edit(id: string, patch: Partial<Candidate>) {
+    setReview((prev) => ({
+      items: prev.items.map((c) => (c.id === id ? editCandidate(c, patch) : c)),
+      links: removeLinks(prev.links, new Set([id])),
+    }));
+  }
+  function add() {
+    const item: Candidate = {
+      id: crypto.randomUUID(),
+      source: "XLSX",
+      fileName: "직접 입력",
+      location: "직접 입력",
+      originalText: "",
+      originalNumber: null,
+      label: "새 항목",
+      number: "",
+      unit: "미확인",
+      normalizedValue: null,
+      field: "unknown",
+      asOf: "",
+      period: "",
+      scenario: "",
+      certainty: "미확인",
+      confirmed: false,
+      excluded: false,
+      method: "직접 입력",
+      confidence: "확인 필요",
+      note: "원본 문맥을 확인하고 필요한 정보를 입력하세요.",
+    };
+    setReview((prev) => ({ ...prev, items: [item, ...prev.items] }));
+  }
+  function link(a: string, b: string) {
+    setReview((prev) => {
+      const x = prev.items.find(
+          (c) => c.id === a && !c.excluded && c.source === "XLSX",
+        ),
+        y = prev.items.find(
+          (c) => c.id === b && !c.excluded && c.source === "DOCX",
+        );
+      if (!x || !y || prev.links.some((l) => l.xlsxId === a && l.docxId === b))
+        return prev;
+      return {
+        ...prev,
+        links: [
+          ...prev.links,
+          { id: crypto.randomUUID(), xlsxId: a, docxId: b },
+        ],
+      };
+    });
+  }
   return (
     <>
       <header>
@@ -21,23 +92,76 @@ export default function App() {
       </header>
       <main>
         <div className="intro">
-          <h1>문서 추출</h1>
-          <p>Excel 재무표와 Word 보고서를 선택하고 추출된 값과 위치를 확인합니다.</p>
+          <h1>{step === "raw" ? "문서 추출" : "데이터 확인"}</h1>
+          <p>문서에서 재무 항목 후보를 찾고 단위와 적용 범위를 확인합니다.</p>
         </div>
+        <nav className="steps" aria-label="작업 단계">
+          <Button
+            variant={step === "raw" ? "default" : "outline"}
+            aria-pressed={step === "raw"}
+            onClick={() => setStep("raw")}
+          >
+            1. 원본 추출
+          </Button>
+          <Button
+            variant={step === "review" ? "default" : "outline"}
+            aria-pressed={step === "review"}
+            onClick={() => setStep("review")}
+          >
+            2. 데이터 확인 ({review.items.filter((c) => !c.excluded).length})
+          </Button>
+        </nav>
         <div className="scope">
-          파일은 외부 서버로 전송하지 않습니다. 현재 단계에서는 데이터를 추출하며, 계산 검증이나 문서 간 비교는 수행하지
-          않습니다.
+          파일은 외부 서버로 전송하지 않습니다. 추출 후보와 문서 간 연결은
+          사용자 확인 대상이며, 계산 오류 판정은 수행하지 않습니다.
         </div>
-        <div className="workspace">
-          <DocumentPanel extension="xlsx" title="Excel 재무표" parse={parseXlsx}>
+        <div className="workspace" hidden={step !== "raw"}>
+          <DocumentPanel
+            extension="xlsx"
+            title="Excel 재무표"
+            parse={parseXlsx}
+            onData={(data) =>
+              replaceSource("XLSX", data ? extractWorkbook(data) : [])
+            }
+          >
             {(data) => <WorkbookView data={data} />}
           </DocumentPanel>
-          <DocumentPanel extension="docx" title="Word 보고서" parse={parseDocx}>
+          <DocumentPanel
+            extension="docx"
+            title="Word 보고서"
+            parse={parseDocx}
+            onData={(data) =>
+              replaceSource("DOCX", data ? extractWord(data) : [])
+            }
+          >
             {(data) => <WordView data={data} />}
           </DocumentPanel>
         </div>
+        {step === "review" && (
+          <ReviewView
+            items={review.items}
+            links={review.links}
+            onEdit={edit}
+            onAdd={add}
+            onLink={link}
+            onUnlink={(id) =>
+              setReview((prev) => ({
+                ...prev,
+                links: prev.links.filter((l) => l.id !== id),
+              }))
+            }
+            onConfirm={(id) =>
+              setReview((prev) => ({
+                ...prev,
+                items: prev.items.map((c) =>
+                  c.id === id && canConfirm(c) ? { ...c, confirmed: true } : c,
+                ),
+              }))
+            }
+          />
+        )}
       </main>
-      <footer>PlanCheck · XLSX / DOCX 원본 추출</footer>
+      <footer>PlanCheck · 문서 추출 및 데이터 확인</footer>
     </>
   );
 }

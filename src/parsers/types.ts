@@ -6,6 +6,7 @@
   result?: string;
   review: boolean;
   type: string;
+  numberFormat?: string;
 };
 export type Workbook = {
   fileName: string;
