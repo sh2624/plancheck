@@ -1,0 +1,281 @@
+@import "tailwindcss";
+@theme {
+  --font-sans: "Pretendard Variable", Pretendard, sans-serif;
+  --font-mono: "Pretendard Variable", Pretendard, sans-serif;
+}
+:root {
+  font-family: "Pretendard Variable", Pretendard, sans-serif;
+  color: #172b43;
+  background: #f5f6f8;
+  font-synthesis: none;
+  line-height: 1.6;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+button,
+input,
+select,
+textarea,
+input::file-selector-button,
+code,
+pre {
+  font: inherit;
+}
+button,
+summary {
+  cursor: pointer;
+}
+header {
+  background: white;
+  border-bottom: 1px solid #dce1e7;
+  padding: 20px 32px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+.brand,
+.privacy,
+h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.brand strong {
+  font-size: 21px;
+}
+.brand span,
+.privacy {
+  color: #657386;
+  font-size: 13px;
+}
+main {
+  max-width: 1800px;
+  margin: auto;
+  padding: 28px 32px;
+}
+h1 {
+  font-size: 22px;
+  font-weight: 650;
+  margin: 4px 0 8px;
+}
+h2 {
+  font-size: 17px;
+  font-weight: 600;
+}
+h3 {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.intro > p:last-child {
+  color: #64748b;
+}
+.scope {
+  color: #526174;
+  border-block: 1px solid #dce1e7;
+  padding: 10px 0;
+  margin: 20px 0;
+  font-size: 13px;
+}
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.document-panel {
+  background: white;
+  border: 1px solid #dce1e7;
+  border-radius: 3px;
+  min-width: 0;
+  overflow: hidden;
+}
+.panel-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #dce1e7;
+  padding: 16px 20px;
+}
+.upload {
+  padding: 20px;
+  border-bottom: 1px solid #e5e9ee;
+}
+.upload label {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+input[type="file"] {
+  display: block;
+  max-width: 100%;
+  font-size: 13px;
+}
+input::file-selector-button {
+  background: #183553;
+  color: white;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 4px;
+  margin-right: 10px;
+  cursor: pointer;
+}
+.file-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 15px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.muted,
+small {
+  color: #64748b;
+  font-size: 12px;
+}
+.empty {
+  padding: 28px 20px;
+  color: #748195;
+  font-size: 13px;
+}
+.source {
+  padding: 16px 20px 8px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.sheet-label {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 20px;
+  font-size: 13px;
+}
+select {
+  padding: 5px;
+  border: 1px solid #cbd5e1;
+  max-width: 80%;
+  border-radius: 4px;
+}
+.notice {
+  margin: 10px 20px;
+  font-size: 12px;
+  color: #725214;
+  background: #fffbeb;
+  padding: 10px;
+}
+details {
+  margin: 12px 20px;
+  font-size: 12px;
+}
+.table-scroll {
+  overflow: auto;
+  max-height: 650px;
+}
+table {
+  font-variant-numeric: tabular-nums;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  text-align: left;
+}
+th {
+  position: sticky;
+  top: 0;
+  background: #eef2f6;
+  white-space: nowrap;
+  font-weight: 600;
+}
+th,
+td {
+  padding: 10px;
+  border: 1px solid #e1e6ed;
+  vertical-align: top;
+}
+td {
+  min-width: 75px;
+  overflow-wrap: anywhere;
+  max-width: 360px;
+}
+.pre {
+  white-space: pre-wrap;
+}
+code {
+  font-size: 11px;
+}
+.warning {
+  color: #875b0e;
+  white-space: nowrap;
+}
+.error {
+  margin: 20px;
+  padding: 12px;
+  background: #fef2f2;
+  color: #b42318;
+  font-size: 13px;
+}
+.pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 14px;
+  font-size: 12px;
+}
+.word-content {
+  max-height: 800px;
+  overflow: auto;
+  padding: 0 20px 20px;
+}
+.paragraph {
+  padding: 12px 0;
+  border-bottom: 1px solid #edf0f4;
+}
+.paragraph p {
+  margin: 4px 0;
+  font-size: 13px;
+}
+.paragraph .numbers {
+  color: #526782;
+  font-size: 11px;
+}
+.word-table {
+  margin: 20px 0;
+}
+.word-table td {
+  min-width: 130px;
+}
+footer {
+  padding: 0 32px 24px;
+  font-size: 12px;
+  color: #7b8795;
+}
+:focus-visible {
+  outline: 2px solid #1d4ed8;
+  outline-offset: 3px;
+}
+@media (max-width: 1100px) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 600px) {
+  main {
+    padding: 24px 12px;
+  }
+  header {
+    padding: 16px;
+  }
+  .brand span {
+    display: none;
+  }
+  h1 {
+    font-size: 20px;
+  }
+  .privacy {
+    font-size: 11px;
+  }
+}
