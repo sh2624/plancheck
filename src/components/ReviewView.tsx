@@ -14,7 +14,8 @@ type Props = {
   onLink: (a: string, b: string) => void;
   onUnlink: (id: string) => void;
 };
-/** 원문과 편집 값을 나란히 검토하고 문서 연결을 명시적으로 승인하는 작업 화면. */
+
+/** 목록은 항목·값·원본·확인 상태만 보여주고 모든 수정 기능은 행의 상세 편집에서 유지한다. */
 export function ReviewView({
   items,
   links,
@@ -33,29 +34,36 @@ export function ReviewView({
     }
   }, [focusIds]);
   const [filter, setFilter] = useState(focusIds.length ? "관련 항목" : "전체"),
+    [search, setSearch] = useState(""),
     [page, setPage] = useState(0),
     [a, setA] = useState(""),
-    [b, setB] = useState("");
+    [b, setB] = useState(""),
+    [linkPage, setLinkPage] = useState(0);
   const active = items.filter((c) => !c.excluded),
-    filtered = items.filter((c) =>
-      filter === "제외됨"
+    query = search.trim().toLowerCase();
+  const filtered = items.filter(
+    (c) =>
+      (filter === "제외됨"
         ? c.excluded
         : !c.excluded &&
           (filter === "전체" ||
             (filter === "미확인" && !c.confirmed) ||
             (filter === "관련 항목" && focusIds.includes(c.id)) ||
-            c.source === filter),
-    );
+            c.source === filter)) &&
+      (!query ||
+        [c.label, c.location, c.fileName].some((v) =>
+          v.toLowerCase().includes(query),
+        )),
+  );
   const pageIndex = Math.min(
-    page,
-    Math.max(0, Math.ceil(filtered.length / 20) - 1),
-  );
-  const suggestions = suggestLinks(items, links);
-  const [linkPage, setLinkPage] = useState(0);
-  const linkIndex = Math.min(
-    linkPage,
-    Math.max(0, Math.ceil(suggestions.length / 20) - 1),
-  );
+      page,
+      Math.max(0, Math.ceil(filtered.length / 20) - 1),
+    ),
+    suggestions = suggestLinks(items, links),
+    linkIndex = Math.min(
+      linkPage,
+      Math.max(0, Math.ceil(suggestions.length / 20) - 1),
+    );
   const find = (id: string) => items.find((c) => c.id === id);
   const describe = (c: Candidate | undefined) =>
     c
@@ -75,186 +83,224 @@ export function ReviewView({
           {active.filter((c) => c.confirmed).length}개 · 제외{" "}
           {items.length - active.length}개
         </span>
-        <Button onClick={onAdd} variant="outline">
+        <Button
+          variant="outline"
+          onClick={() => {
+            setFilter("전체");
+            setSearch("");
+            setPage(0);
+            onAdd();
+          }}
+        >
           항목 직접 추가
         </Button>
       </div>
       <p className="notice">
-        자동 추출은 후보입니다. 원문과 단위·시점을 확인한 후 ‘확인 완료’를
-        선택하세요. 금액은 원 단위로 반올림합니다. 검증에 필요한 항목만
-        선택적으로 확인한 뒤 ‘검수 결과’ 단계로 이동하세요.
+        필요한 항목만 확인하세요. 기준일·기간·시나리오·항목 유형·확정 여부와
+        모든 수정 기능은 ‘상세 편집’에 있습니다. 확인되지 않은 값은 확정 오류로
+        판정하지 않습니다.
       </p>
-      <label className="review-filter">
-        목록 필터{" "}
-        <select
-          value={filter}
-          onChange={(e) => {
-            setFilter(e.target.value);
-            setPage(0);
-          }}
-        >
-          {[
-            "전체",
-            "미확인",
-            "XLSX",
-            "DOCX",
-            "제외됨",
-            ...(focusIds.length ? ["관련 항목"] : []),
-          ].map((x) => (
-            <option key={x}>{x}</option>
-          ))}
-        </select>
-      </label>
-      <div className="table-scroll review-table">
+      <div className="review-filters">
+        <label>
+          목록 필터
+          <select
+            value={filter}
+            onChange={(e) => {
+              setFilter(e.target.value);
+              setPage(0);
+            }}
+          >
+            {[
+              "전체",
+              "미확인",
+              "XLSX",
+              "DOCX",
+              "제외됨",
+              ...(focusIds.length ? ["관련 항목"] : []),
+            ].map((v) => (
+              <option key={v}>{v}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          항목 검색
+          <input
+            type="search"
+            value={search}
+            placeholder="항목명 또는 원본 위치"
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(0);
+            }}
+          />
+        </label>
+      </div>
+      <div className="table-scroll review-table compact-review">
         <table>
           <thead>
             <tr>
-              <th>원본 위치·문맥</th>
-              <th>항목</th>
-              <th>숫자·단위</th>
-              <th>기준·적용 범위</th>
-              <th>상태·확인</th>
+              <th>항목명</th>
+              <th>값·단위</th>
+              <th>원본</th>
+              <th>확인 상태</th>
             </tr>
           </thead>
           <tbody>
             {filtered.slice(pageIndex * 20, (pageIndex + 1) * 20).map((c) => (
               <tr key={c.id} className={c.excluded ? "excluded" : ""}>
                 <td>
-                  <strong>
-                    {c.source} · {c.location}
-                  </strong>
-                  <p>{c.fileName}</p>
-                  {c.method === "직접 입력" && (
-                    <>
+                  <strong>{c.label}</strong>
+                  <details
+                    className="candidate-editor"
+                    name="candidate-editor"
+                    open={c.method === "직접 입력" && !c.confirmed}
+                  >
+                    <summary>상세 편집</summary>
+                    <div className="candidate-editor-grid">
                       <label>
-                        원본 종류
-                        <select
-                          value={c.source}
+                        항목명
+                        <input
+                          value={c.label}
                           onChange={(e) =>
-                            onEdit(c.id, {
-                              source: e.target.value as Candidate["source"],
-                            })
+                            onEdit(c.id, { label: e.target.value })
+                          }
+                        />
+                      </label>
+                      <label>
+                        항목 유형
+                        <select
+                          value={c.field}
+                          onChange={(e) =>
+                            onEdit(c.id, { field: e.target.value as Field })
                           }
                         >
-                          <option>XLSX</option>
-                          <option>DOCX</option>
+                          {Object.entries(fieldLabels).map(([key, value]) => (
+                            <option key={key} value={key}>
+                              {value}
+                            </option>
+                          ))}
                         </select>
                       </label>
                       <label>
-                        참조 파일명
+                        숫자
                         <input
-                          value={c.fileName}
+                          inputMode="decimal"
+                          value={c.number}
                           onChange={(e) =>
-                            onEdit(c.id, { fileName: e.target.value })
+                            onEdit(c.id, { number: e.target.value })
                           }
                         />
                       </label>
                       <label>
-                        참조 위치
-                        <input
-                          value={c.location}
+                        단위
+                        <select
+                          value={c.unit}
                           onChange={(e) =>
-                            onEdit(c.id, { location: e.target.value })
+                            onEdit(c.id, { unit: e.target.value as Unit })
                           }
-                        />
+                        >
+                          {units.map((u) => (
+                            <option key={u}>{u}</option>
+                          ))}
+                        </select>
                       </label>
-                    </>
-                  )}
-                  <details>
+                      {(["asOf", "period", "scenario"] as const).map(
+                        (key, i) => (
+                          <label key={key}>
+                            {["기준일", "적용 기간 / 기한", "시나리오"][i]}
+                            <input
+                              value={c[key]}
+                              placeholder="미확인"
+                              onChange={(e) =>
+                                onEdit(c.id, { [key]: e.target.value })
+                              }
+                            />
+                          </label>
+                        ),
+                      )}
+                      <label>
+                        확정 여부
+                        <select
+                          value={c.certainty}
+                          onChange={(e) =>
+                            onEdit(c.id, {
+                              certainty: e.target
+                                .value as Candidate["certainty"],
+                            })
+                          }
+                        >
+                          {["미확인", "확정", "가정", "조건부"].map((v) => (
+                            <option key={v}>{v}</option>
+                          ))}
+                        </select>
+                      </label>
+                      {c.method === "직접 입력" && (
+                        <>
+                          <label>
+                            원본 종류
+                            <select
+                              value={c.source}
+                              onChange={(e) =>
+                                onEdit(c.id, {
+                                  source: e.target.value as Candidate["source"],
+                                })
+                              }
+                            >
+                              <option>XLSX</option>
+                              <option>DOCX</option>
+                            </select>
+                          </label>
+                          <label>
+                            참조 파일명
+                            <input
+                              value={c.fileName}
+                              onChange={(e) =>
+                                onEdit(c.id, { fileName: e.target.value })
+                              }
+                            />
+                          </label>
+                          <label>
+                            참조 위치
+                            <input
+                              value={c.location}
+                              onChange={(e) =>
+                                onEdit(c.id, { location: e.target.value })
+                              }
+                            />
+                          </label>
+                        </>
+                      )}
+                      <p>
+                        정규화:{" "}
+                        {c.normalizedValue === null
+                          ? "확인 필요"
+                          : `${c.normalizedValue.toLocaleString("ko-KR", { maximumFractionDigits: 10 })} ${["원", "만 원", "억 원"].includes(c.unit) ? "원" : c.unit}`}
+                      </p>
+                    </div>
+                  </details>
+                </td>
+                <td>
+                  <p className="candidate-value">
+                    {c.number || "값 없음"} {c.unit}
+                  </p>
+                </td>
+                <td>
+                  <strong>{c.source}</strong>
+                  <p>{c.fileName}</p>
+                  <small>{c.location}</small>
+                  <details className="source-context">
                     <summary>원본 문맥</summary>
                     <p className="pre">
                       {c.originalText || "직접 추가한 항목"}
                     </p>
                     <p>추출 숫자: {c.originalNumber ?? "없음"}</p>
+                    <small>
+                      {c.method} · {c.confidence}
+                    </small>
+                    <p className="muted">{c.note}</p>
                   </details>
-                  <small>
-                    {c.method} · {c.confidence}
-                  </small>
-                  <p className="muted">{c.note}</p>
                 </td>
                 <td>
-                  <label>
-                    항목명
-                    <input
-                      value={c.label}
-                      onChange={(e) => onEdit(c.id, { label: e.target.value })}
-                    />
-                  </label>
-                  <label>
-                    항목 유형
-                    <select
-                      value={c.field}
-                      onChange={(e) =>
-                        onEdit(c.id, { field: e.target.value as Field })
-                      }
-                    >
-                      {Object.entries(fieldLabels).map(([k, v]) => (
-                        <option key={k} value={k}>
-                          {v}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </td>
-                <td>
-                  <label>
-                    숫자
-                    <input
-                      inputMode="decimal"
-                      value={c.number}
-                      onChange={(e) => onEdit(c.id, { number: e.target.value })}
-                    />
-                  </label>
-                  <label>
-                    단위
-                    <select
-                      value={c.unit}
-                      onChange={(e) =>
-                        onEdit(c.id, { unit: e.target.value as Unit })
-                      }
-                    >
-                      {units.map((u) => (
-                        <option key={u}>{u}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <p>
-                    정규화:{" "}
-                    {c.normalizedValue === null
-                      ? "확인 필요"
-                      : `${c.normalizedValue.toLocaleString("ko-KR", { maximumFractionDigits: 10 })} ${["원", "만 원", "억 원"].includes(c.unit) ? "원" : c.unit}`}
-                  </p>
-                </td>
-                <td>
-                  {(["asOf", "period", "scenario"] as const).map((key, i) => (
-                    <label key={key}>
-                      {["기준일", "적용 기간 / 기한", "시나리오"][i]}
-                      <input
-                        value={c[key]}
-                        placeholder="미확인"
-                        onChange={(e) =>
-                          onEdit(c.id, { [key]: e.target.value })
-                        }
-                      />
-                    </label>
-                  ))}
-                </td>
-                <td>
-                  <label>
-                    확정 여부
-                    <select
-                      value={c.certainty}
-                      onChange={(e) =>
-                        onEdit(c.id, {
-                          certainty: e.target.value as Candidate["certainty"],
-                        })
-                      }
-                    >
-                      {["미확인", "확정", "가정", "조건부"].map((x) => (
-                        <option key={x}>{x}</option>
-                      ))}
-                    </select>
-                  </label>
                   <p className={c.confirmed ? "confirmed" : "warning"}>
                     {c.confirmed ? "사용자 확인 완료" : "확인 필요"}
                   </p>
@@ -279,7 +325,8 @@ export function ReviewView({
       </div>
       {!filtered.length && (
         <p className="empty">
-          표시할 후보가 없습니다. 문서를 업로드하거나 항목을 직접 추가하세요.
+          표시할 후보가 없습니다. 검색·필터를 확인하거나 필요한 항목을 직접
+          추가하세요.
         </p>
       )}
       <div className="pagination">

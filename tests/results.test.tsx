@@ -37,9 +37,7 @@ it("계산 오류를 선택해 원문과 위치를 확인하고 관련 항목으
   expect(
     screen.getByText("오류", { exact: true, selector: "span" }),
   ).toBeTruthy();
-  fireEvent.click(
-    screen.getByRole("button", { name: "CALC_ASSETS · 총자산 합계" }),
-  );
+  fireEvent.click(screen.getByRole("button", { name: /CALC_ASSETS/ }));
   const detail = screen.getByRole("region", { name: "검증 근거 상세" });
   expect(within(detail).getByText("원본 a 40")).toBeTruthy();
   expect(within(detail).getAllByText(/test.xlsx · 기준일/)).toHaveLength(3);
@@ -59,8 +57,10 @@ it("계산 오류를 선택해 원문과 위치를 확인하고 관련 항목으
   ).toBeTruthy();
 });
 it("자료가 없을 때 필수 입력과 검증 불가 상태를 표시한다", () => {
+  const prepare = vi.fn();
   render(
     <ResultsView
+      onPrepare={prepare}
       items={[]}
       links={[]}
       calculations={[newCalculation("net", "n")]}
@@ -73,4 +73,9 @@ it("자료가 없을 때 필수 입력과 검증 불가 상태를 표시한다",
   ).toBeTruthy();
   expect(screen.getByText(/검사할 순자산 항목을 선택/)).toBeTruthy();
   expect(screen.getByText(/총부채: 1개 선택 필요/)).toBeTruthy();
+  expect(screen.getByText("검증 준비 중", { exact: true })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "추천 검토·승인" }));
+  expect(prepare).toHaveBeenCalledWith(
+    expect.objectContaining({ code: "CALC_NET", status: "검증 불가" }),
+  );
 });

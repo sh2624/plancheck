@@ -627,3 +627,119 @@ footer {
   margin-bottom: 18px;
   font-size: 13px;
 }
+
+.review-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 18px;
+  padding: 16px 20px;
+  font-size: 12px;
+}
+.review-filters label {
+  display: block;
+}
+.review-filters select,
+.review-filters input {
+  display: block;
+  padding: 6px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 3px;
+  margin-top: 4px;
+  background: white;
+}
+.compact-review td {
+  padding: 14px;
+}
+.compact-review td:nth-child(2) {
+  min-width: 140px;
+}
+.compact-review td:nth-child(3) {
+  min-width: 240px;
+}
+.compact-review .candidate-value {
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.compact-review .candidate-editor {
+  margin: 10px 0 0;
+}
+.candidate-editor > summary {
+  color: #334f70;
+  font-size: 12px;
+}
+.candidate-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  width: min(620px, calc(100vw - 120px));
+  gap: 8px 16px;
+  padding: 14px 0;
+}
+.compact-review td:has(.candidate-editor[open]) {
+  min-width: 640px;
+  max-width: 660px;
+}
+.compact-review .source-context {
+  margin: 8px 0;
+}
+.result-title {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+}
+.result-code {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  color: #64748b;
+  margin-top: 5px;
+}
+.results .result-link {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  color: #172b43;
+}
+.result-link:hover .result-title {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.preparation-title {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #526174;
+  margin-bottom: 4px;
+}
+.preparation-label {
+  font-size: 11px;
+}
+.result-explanation {
+  margin: 6px 0;
+  font-size: 12px;
+  color: #526174;
+}
+.result-next {
+  margin: 8px 0;
+  font-size: 12px;
+}
+.results td details {
+  margin: 10px 0;
+}
+.result-detail h3 {
+  font-size: 19px;
+  line-height: 1.5;
+}
+@media (max-width: 800px) {
+  .candidate-editor-grid {
+    grid-template-columns: minmax(220px, 1fr);
+    width: min(380px, 80vw);
+  }
+  .compact-review td:has(.candidate-editor[open]) {
+    min-width: 400px;
+    max-width: 420px;
+  }
+}

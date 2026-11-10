@@ -6,7 +6,7 @@ import { WordView } from "./components/WordView";
 import { ReviewView } from "./components/ReviewView";
 import { ResultsView } from "./components/ResultsView";
 import { newCalculation, ruleTitles } from "./validation/types";
-import type { Calculation, Rule } from "./validation/types";
+import type { Calculation, Rule, Result } from "./validation/types";
 import { Button } from "./components/ui/button";
 import { parseXlsx } from "./parsers/xlsx";
 import { parseDocx } from "./parsers/docx";
@@ -36,6 +36,12 @@ export default function App() {
   const [planning, setPlanning] = useState(emptyPlanning);
   const [sourceReferences, setSourceReferences] = useState<EvidenceRef[]>([]);
   const [documents, setDocuments] = useState<Documents>({});
+  const [recommendationFocus, setRecommendationFocus] = useState<{
+    id: string;
+    kind: string;
+    request: string;
+  }>();
+  const [approvalVersion, setApprovalVersion] = useState(0);
   const [planFocus, setPlanFocus] = useState<{
     kind: "allocations" | "funds" | "actions";
     id: string;
@@ -61,6 +67,50 @@ export default function App() {
     const next = applyRecommendation({ ...review, calculations }, r, approve);
     setReview({ items: next.items, links: next.links });
     setCalculations(next.calculations);
+    if (approve) setApprovalVersion((v) => v + 1);
+  }
+  /** 판정에 사용한 항목과 일치하는 추천 또는 구조화 확인 화면으로 안내한다. */
+  function prepare(result: Result) {
+    const exact = recommendations.find(
+      (r) =>
+        (r.calculation && `calc:${r.calculation.id}` === result.id) ||
+        (r.link &&
+          result.evidence.some((c) => c.id === r.link!.xlsxId) &&
+          result.evidence.some((c) => c.id === r.link!.docxId)),
+    );
+    const kind = result.code.startsWith("CALC")
+      ? "CALC"
+      : result.code.startsWith("CROSS")
+        ? "CROSS"
+        : result.code.startsWith("ALLOC")
+          ? "ALLOC"
+          : "PLAN";
+    const candidate =
+      exact ??
+      recommendations.find(
+        (r) =>
+          r.kind === kind &&
+          (r.calculation
+            ? result.code === `CALC_${r.calculation.rule.toUpperCase()}`
+            : r.references.some((ref) =>
+                result.references?.some(
+                  (x) =>
+                    x.source === ref.source &&
+                    x.fileName === ref.fileName &&
+                    x.location === ref.location,
+                ),
+              )),
+      ) ??
+      recommendations.find((r) => r.kind === kind);
+    if (candidate?.planFocus) {
+      openPlan(candidate);
+      return;
+    }
+    setRecommendationFocus({
+      id: candidate?.id ?? "",
+      kind,
+      request: crypto.randomUUID(),
+    });
   }
   function openPlan(r: Recommendation) {
     revision.current++;
@@ -322,8 +372,12 @@ export default function App() {
         )}
         {step === "results" && (
           <ResultsView
+            onPrepare={prepare}
+            approvalVersion={approvalVersion}
             recommendationPanel={
               <RecommendationCenter
+                key={recommendationFocus?.request ?? "recommendations"}
+                focus={recommendationFocus}
                 recommendations={recommendations}
                 items={review.items}
                 links={review.links}

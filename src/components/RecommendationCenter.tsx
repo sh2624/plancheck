@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { Candidate, Link } from "../normalization/types";
 import { fieldLabels, units } from "../normalization/types";
 import { canConfirm } from "../normalization/values";
@@ -7,6 +7,7 @@ import { rules } from "../validation/types";
 import type { Recommendation } from "../recommendations/types";
 import { Button } from "./ui/button";
 type Props = {
+  focus?: { id: string; kind: string };
   recommendations: Recommendation[];
   items: Candidate[];
   links: Link[];
@@ -19,9 +20,16 @@ type Props = {
 /** 추천 근거와 원본을 먼저 보여주고 선택한 구성에 대해서만 사용자의 명시적 승인을 받는다. */
 export function RecommendationCenter(props: Props) {
   const { recommendations, links, calculations, onInspect, onPlan } = props;
-  const [kind, setKind] = useState("전체"),
-    [extra, setExtra] = useState(false),
-    [selected, setSelected] = useState(""),
+  const root = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    if (props.focus) {
+      root.current?.scrollIntoView?.({ block: "start" });
+      root.current?.querySelector("summary")?.focus();
+    }
+  }, [props.focus]);
+  const [kind, setKind] = useState(props.focus?.kind ?? "전체"),
+    [extra, setExtra] = useState(!!props.focus),
+    [selected, setSelected] = useState(props.focus?.id ?? ""),
     [page, setPage] = useState(0),
     [open, setOpen] = useState(true);
   const visible = recommendations.filter(
@@ -52,6 +60,7 @@ export function RecommendationCenter(props: Props) {
   }
   return (
     <details
+      ref={root}
       className="recommendation-center"
       open={open}
       onToggle={(e) => setOpen(e.currentTarget.open)}
