@@ -1,4 +1,5 @@
-﻿import type { Candidate } from "../normalization/types";
+import type { Candidate } from "../normalization/types";
+import { provisional } from "../validation/discovery";
 import { normalize } from "../normalization/values";
 import type { EvidenceRef, Result } from "../validation/types";
 import type { Allocation, PlanAction, Planning, RecordBase } from "./types";
@@ -49,13 +50,17 @@ function result(
     needs: [],
   };
 }
-function recordIssues(rows: RecordBase[], items: Candidate[]): string[] {
+function recordIssues(
+  rows: RecordBase[],
+  items: Candidate[],
+  discovery = false,
+): string[] {
   return rows.flatMap((r) => [
-    ...(!r.confirmed ? [`${r.label}: 사용자 확인 필요`] : []),
+    ...(!discovery && !r.confirmed ? [`${r.label}: 사용자 확인 필요`] : []),
     ...(!r.label.trim() ? [`${r.id}: 항목명 필요`] : []),
     ...r.candidateIds.flatMap((id) => {
       const c = items.find((c) => c.id === id);
-      return !c || c.excluded || !c.confirmed
+      return !c || c.excluded || (!discovery && !c.confirmed)
         ? [`${r.label}: 연결 원본 항목 누락·제외·미확인`]
         : [];
     }),
@@ -72,10 +77,14 @@ function recordIssues(rows: RecordBase[], items: Candidate[]): string[] {
       : []),
   ]);
 }
-function candidateIssues(c: Candidate | undefined, name: string): string[] {
+function candidateIssues(
+  c: Candidate | undefined,
+  name: string,
+  discovery = false,
+): string[] {
   if (!c) return [`${name} 항목을 연결하세요.`];
   return [
-    ...(!c.confirmed || c.excluded
+    ...((!discovery && !c.confirmed) || c.excluded
       ? [`${name}: 원본 확인 또는 제외 해제 필요`]
       : []),
     ...(money(c.number, c.unit) === null ||
@@ -95,9 +104,10 @@ function sumAmounts(rows: Allocation[]): number | null {
   return total;
 }
 /** 동일 자산·동일 시나리오의 시간 구간별 동시 배정 최대값을 검사한다. 미래 적립금은 별도 보류한다. */
-export function validateAllocations(
+function evaluateAllocations(
   items: Candidate[],
   allocations: Allocation[],
+  discovery = false,
 ): Result[] {
   const active = allocations.filter((r) => !r.excluded),
     out: Result[] = [];
@@ -124,8 +134,8 @@ export function validateAllocations(
       ),
     ];
     const unavailable = [
-      ...candidateIssues(asset, "보유 자산"),
-      ...goals.flatMap((g) => candidateIssues(g, "목표액")),
+      ...candidateIssues(asset, "보유 자산", discovery),
+      ...goals.flatMap((g) => candidateIssues(g, "목표액", discovery)),
       ...recordIssues(
         rows.map((r) => ({
           ...r,
@@ -136,6 +146,7 @@ export function validateAllocations(
           ],
         })),
         items,
+        discovery,
       ).filter((x) => !x.includes("원본 위치·문맥 연결 필요")),
     ];
     if (
@@ -239,9 +250,10 @@ export function validateAllocations(
   return out;
 }
 /** 미승인·미수령인 가정/조건부 금액의 현재 확정 반영을 검사한다. 예상 시나리오는 분리한다. */
-export function validateConditionalFunds(
+function evaluateConditionalFunds(
   items: Candidate[],
   state: Planning,
+  discovery = false,
 ): Result[] {
   return state.funds
     .filter((r) => !r.excluded)
@@ -254,7 +266,7 @@ export function validateConditionalFunds(
           items,
         ),
         amount = money(row.amount, row.unit);
-      const unavailable = recordIssues([row], items);
+      const unavailable = recordIssues([row], items, discovery);
       if (amount === null || amount < 0)
         unavailable.push("0 이상의 금액·단위를 확인하세요.");
       if (unavailable.length) return { ...base, needs: unavailable };
@@ -337,9 +349,10 @@ const opposite = (a: PlanAction["action"], b: PlanAction["action"]) =>
   (a === "증액" && b === "감액") ||
   (a === "감액" && b === "증액");
 /** 같은 대상 ID의 제안·실행만 비교한다. 행동의 부정·대상 동일성은 사용자가 확인한다. */
-export function validateActions(
+function evaluateActions(
   items: Candidate[],
   actions: PlanAction[],
+  discovery = false,
 ): Result[] {
   const active = actions.filter((r) => !r.excluded),
     output: Result[] = [];
@@ -360,7 +373,7 @@ export function validateActions(
           [a, b],
           items,
         ),
-        invalid = recordIssues([a, b], items);
+        invalid = recordIssues([a, b], items, discovery);
       if (invalid.length) {
         output.push({ ...base, needs: invalid });
         continue;
@@ -460,11 +473,43 @@ export function validateActions(
         items,
       ),
       needs: [
-        ...recordIssues([row], items),
+        ...recordIssues([row], items, discovery),
         "동일 대상 ID의 제안·실행 상대 항목을 연결하고 행동·기간·시나리오를 확인하세요.",
       ],
     });
   return output;
+}
+/** 승인된 구조화 자금 배정만 검사한다. */
+export function validateAllocations(
+  items: Candidate[],
+  rows: Allocation[],
+): Result[] {
+  return evaluateAllocations(items, rows);
+}
+/** 승인된 조건부 금액만 검사한다. */
+export function validateConditionalFunds(
+  items: Candidate[],
+  state: Planning,
+): Result[] {
+  return evaluateConditionalFunds(items, state);
+}
+/** 승인된 제안·실행만 검사한다. */
+export function validateActions(
+  items: Candidate[],
+  rows: PlanAction[],
+): Result[] {
+  return evaluateActions(items, rows);
+}
+/** 명시적으로 연결된 계획을 참고 분석하며 확인 여부·시점·관계를 채우지 않는다. */
+export function discoverPlanning(
+  items: Candidate[],
+  state: Planning,
+): Result[] {
+  return [
+    ...evaluateAllocations(items, state.allocations, true),
+    ...evaluateConditionalFunds(items, state, true),
+    ...evaluateActions(items, state.actions, true),
+  ].map(provisional);
 }
 /** 기존 CALC·CROSS와 독립적인 자금 배정·계획 검증 진입점. */
 export function validatePlanning(

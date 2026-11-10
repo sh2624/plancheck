@@ -2,6 +2,7 @@
 import { normalize, compatibleUnit } from "../normalization/values";
 import type { Calculation, Result } from "./types";
 import { rules, ruleTitles } from "./types";
+import { provisional } from "./discovery";
 const money = (c: Candidate) => ["원", "만 원", "억 원"].includes(c.unit);
 const compact = (s: string) => s.replace(/\s+/g, "");
 const monthly = (s: string) => ["월", "월간", "매월"].includes(compact(s));
@@ -15,11 +16,11 @@ const flow = (c: Candidate) =>
     "loanPayment",
   ].includes(c.field);
 /** 입력 숫자를 재정규화해 누락·오래된 정규화 값·단위 오류를 검사한다. */
-function inputIssues(items: Candidate[]): string[] {
+function inputIssues(items: Candidate[], discovery = false): string[] {
   return items.flatMap((c) => {
     const issues: string[] = [];
     if (c.excluded) issues.push(`${c.label}: 제외된 항목`);
-    if (!c.confirmed) issues.push(`${c.label}: 사용자 확인 필요`);
+    if (!discovery && !c.confirmed) issues.push(`${c.label}: 사용자 확인 필요`);
     if (c.field === "unknown")
       issues.push(`${c.label}: 재무 항목 유형 확인 필요`);
     const v = normalize(c.number, c.unit);
@@ -89,8 +90,12 @@ export function annuityPayment(
     ? value
     : null;
 }
-/** 승인된 연결만 비교하며 미확인 값이나 다른 문맥을 확정 불일치로 판정하지 않는다. */
-export function validateCross(items: Candidate[], links: Link[]): Result[] {
+/** 추천·승인 경로의 수치 비교를 공유하고 모드에 따라 사용자 확인 게이트를 적용한다. */
+function evaluateCross(
+  items: Candidate[],
+  links: Link[],
+  discovery = false,
+): Result[] {
   return links.map((link) => {
     const a = items.find((c) => c.id === link.xlsxId),
       b = items.find((c) => c.id === link.docxId);
@@ -105,7 +110,7 @@ export function validateCross(items: Candidate[], links: Link[]): Result[] {
       expected: null,
       difference: null,
       unit: "",
-      basis: "승인된 Excel·Word 동일 항목 연결 비교. 차이 = Excel − Word.",
+      basis: `${discovery ? "추천된" : "승인된"} Excel·Word 동일 항목 연결 비교. 차이 = Excel − Word.`,
       needs: [],
     };
     if (!a || !b)
@@ -113,7 +118,7 @@ export function validateCross(items: Candidate[], links: Link[]): Result[] {
         ...result,
         needs: ["연결된 원본 항목이 없습니다. 연결을 다시 승인하세요."],
       };
-    const invalid = inputIssues(evidence);
+    const invalid = inputIssues(evidence, discovery);
     if (a.source !== "XLSX" || b.source !== "DOCX")
       invalid.push("Excel·Word 연결 방향 확인 필요");
     if (invalid.length) return { ...result, needs: invalid };
@@ -155,10 +160,11 @@ export function validateCross(items: Candidate[], links: Link[]): Result[] {
     );
   });
 }
-/** 사용자가 지정한 계산 범위만 검증한다. React·DOM·파일명·셀 주소에 의존하지 않는다. */
-export function validateCalculation(
+/** 제공된 계산 범위의 공통 계산. 확인 게이트와 원본의 단위·조건 검사를 분리한다. */
+function evaluateCalculation(
   items: Candidate[],
   spec: Calculation,
+  discovery = false,
 ): Result {
   const config = rules[spec.rule],
     target = items.find((c) => c.id === spec.targetId);
@@ -177,8 +183,7 @@ export function validateCalculation(
     expected: null,
     difference: null,
     unit: "원",
-    basis:
-      "사용자가 선택한 항목 범위에 한정한 계산 검증. 차이 = 문서값 − 계산값.",
+    basis: `${discovery ? "자동 추천한" : "사용자가 선택한"} 항목 범위에 한정한 계산 검증. 차이 = 문서값 − 계산값.`,
     needs: [],
   };
   const missing: string[] = [];
@@ -201,7 +206,7 @@ export function validateCalculation(
   }
   if (new Set(ids).size !== ids.length)
     missing.push("같은 항목을 계산 내에서 중복 선택할 수 없습니다.");
-  missing.push(...inputIssues(evidence));
+  missing.push(...inputIssues(evidence, discovery));
   const tolerance = spec.tolerance.trim() === "" ? NaN : Number(spec.tolerance);
   if (
     !Number.isFinite(tolerance) ||
@@ -221,7 +226,7 @@ export function validateCalculation(
       return next;
     }, 0);
   const needs = contextIssues(evidence, spec.rule !== "loan");
-  if (!spec.scopeConfirmed)
+  if (!spec.scopeConfirmed && !discovery)
     needs.push(
       "선택 범위가 완전하며 소계·중복 항목을 포함하지 않는지 확인하세요.",
     );
@@ -323,6 +328,28 @@ export function validateCalculation(
     needs,
     tolerance,
   );
+}
+/** 사용자 승인 연결만 확정 검증에 사용한다. */
+export function validateCross(items: Candidate[], links: Link[]): Result[] {
+  return evaluateCross(items, links);
+}
+/** 기존 사용자 확인·범위 승인 조건을 그대로 적용한다. */
+export function validateCalculation(
+  items: Candidate[],
+  spec: Calculation,
+): Result {
+  return evaluateCalculation(items, spec);
+}
+/** 추천 연결의 숫자 차이만 분석하며 원본 확인·연결 승인을 변경하지 않는다. */
+export function discoverCross(items: Candidate[], links: Link[]): Result[] {
+  return evaluateCross(items, links, true).map(provisional);
+}
+/** 추천 계산 범위의 참고값을 구한다. 불명확한 대출 약정은 기존처럼 보류한다. */
+export function discoverCalculation(
+  items: Candidate[],
+  spec: Calculation,
+): Result {
+  return provisional(evaluateCalculation(items, spec, true));
 }
 /** 설정된 계산과 승인된 연결을 독립적으로 처리하므로 전체 후보 확인을 요구하지 않는다. */
 export function validateAll(
