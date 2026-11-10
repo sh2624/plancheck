@@ -5,6 +5,7 @@ import type { Candidate, Link, Field, Unit } from "../normalization/types";
 import { canConfirm } from "../normalization/values";
 import { suggestLinks } from "../normalization/links";
 type Props = {
+  focusIds?: string[];
   items: Candidate[];
   links: Link[];
   onEdit: (id: string, patch: Partial<Candidate>) => void;
@@ -22,8 +23,9 @@ export function ReviewView({
   onAdd,
   onLink,
   onUnlink,
+  focusIds = [],
 }: Props) {
-  const [filter, setFilter] = useState("전체"),
+  const [filter, setFilter] = useState(focusIds.length ? "관련 항목" : "전체"),
     [page, setPage] = useState(0),
     [a, setA] = useState(""),
     [b, setB] = useState("");
@@ -34,6 +36,7 @@ export function ReviewView({
         : !c.excluded &&
           (filter === "전체" ||
             (filter === "미확인" && !c.confirmed) ||
+            (filter === "관련 항목" && focusIds.includes(c.id)) ||
             c.source === filter),
     );
   const pageIndex = Math.min(
@@ -66,8 +69,8 @@ export function ReviewView({
       </div>
       <p className="notice">
         자동 추출은 후보입니다. 원문과 단위·시점을 확인한 후 ‘확인 완료’를
-        선택하세요. 금액은 원 단위로 반올림하며, 계산 오류 판정은 수행하지
-        않습니다.
+        선택하세요. 금액은 원 단위로 반올림합니다. 검증에 필요한 항목만
+        선택적으로 확인한 뒤 ‘검수 결과’ 단계로 이동하세요.
       </p>
       <label className="review-filter">
         목록 필터{" "}
@@ -78,7 +81,14 @@ export function ReviewView({
             setPage(0);
           }}
         >
-          {["전체", "미확인", "XLSX", "DOCX", "제외됨"].map((x) => (
+          {[
+            "전체",
+            "미확인",
+            "XLSX",
+            "DOCX",
+            "제외됨",
+            ...(focusIds.length ? ["관련 항목"] : []),
+          ].map((x) => (
             <option key={x}>{x}</option>
           ))}
         </select>
@@ -117,6 +127,15 @@ export function ReviewView({
                           <option>XLSX</option>
                           <option>DOCX</option>
                         </select>
+                      </label>
+                      <label>
+                        참조 파일명
+                        <input
+                          value={c.fileName}
+                          onChange={(e) =>
+                            onEdit(c.id, { fileName: e.target.value })
+                          }
+                        />
                       </label>
                       <label>
                         참조 위치

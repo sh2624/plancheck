@@ -260,3 +260,27 @@ it("Word 표의 복수 값과 빈 값을 분리하고 각각의 원본 좌표를
   ).toBeNull();
   expect(items.every((c) => c.location.includes("표 8"))).toBe(true);
 });
+
+it("상환액 설명에 상환방식이 언급되어도 월 상환액 후보를 누락하지 않는다", () => {
+  const inputs = extractWorkbook(
+    sheet([
+      cell("A1", "단위: 만 원", "s"),
+      cell("A2", "신용대출 상환액 (입력된 상환방식에 따름)", "s"),
+      cell("B2", "15.5"),
+    ]),
+  );
+  expect(inputs[0].field).toBe("loanPayment");
+  expect(inputs[0].normalizedValue).toBe(155000);
+});
+
+it("월세 보증금은 월간 현금흐름으로 추정하지 않는다", () => {
+  const items = extractWorkbook(
+    sheet([
+      cell("A1", "단위: 만 원", "s"),
+      cell("A2", "월세 보증금", "s"),
+      cell("B2", "1000"),
+    ]),
+  );
+  expect(items[0].field).toBe("housingDeposit");
+  expect(items[0].period).toBe("");
+});

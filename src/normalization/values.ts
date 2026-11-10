@@ -63,8 +63,8 @@ export function classify(text: string): Field | null {
   if (/대출|학자금/.test(t)) {
     if (/금리|연이율/.test(t)) return "loanRate";
     if (/기간|개월/.test(t)) return "loanTerm";
-    if (/상환방식/.test(t)) return null;
     if (/상환액|원리금/.test(t)) return "loanPayment";
+    if (/상환방식/.test(t)) return null;
     if (/원금/.test(t)) return "loanPrincipal";
     return "loanBalance";
   }

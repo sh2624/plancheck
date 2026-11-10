@@ -133,7 +133,16 @@ export function extractWorkbook(book: Workbook): Candidate[] {
         const period =
           header === "연"
             ? "연간"
-            : header === "월" || /월|고정지출|변동지출|저축·투자/.test(label)
+            : header === "월" ||
+                ([
+                  "income",
+                  "fixedExpense",
+                  "variableExpense",
+                  "savings",
+                  "surplus",
+                  "loanPayment",
+                ].includes(field) &&
+                  /월|고정지출|변동지출|저축·투자/.test(label))
               ? "월간"
               : "";
         const raw = c.review

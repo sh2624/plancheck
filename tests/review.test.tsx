@@ -157,3 +157,42 @@ it("제외·복원·직접 추가를 지원하고 파일 초기화 시 관련 �
   fireEvent.click(within(added).getByRole("button", { name: "확인 완료" }));
   expect(within(added).getByText("사용자 확인 완료")).toBeTruthy();
 });
+
+it("확인한 승인 연결만 결과에 표시하고 편집 후 오래된 판정을 지운다", async () => {
+  const region = await upload();
+  for (const input of within(region).getAllByLabelText("숫자")) {
+    const row = input.closest("tr")!;
+    fireEvent.change(within(row).getByLabelText("기준일"), {
+      target: { value: "2026-10-31" },
+    });
+    fireEvent.change(within(row).getByLabelText("시나리오"), {
+      target: { value: "기본안" },
+    });
+    fireEvent.change(within(row).getByLabelText("적용 기간 / 기한"), {
+      target: { value: "월간" },
+    });
+    fireEvent.change(within(row).getByLabelText("확정 여부"), {
+      target: { value: "확정" },
+    });
+    fireEvent.click(within(row).getByRole("button", { name: "확인 완료" }));
+  }
+  approve(region);
+  fireEvent.click(screen.getByRole("button", { name: "3. 검수 결과" }));
+  expect(
+    screen.getByText("오류", { exact: true, selector: "span" }),
+  ).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: /CROSS_VALUE/ }));
+  fireEvent.click(screen.getByRole("button", { name: "관련 항목 확인·수정" }));
+  expect((screen.getByLabelText("목록 필터") as HTMLSelectElement).value).toBe(
+    "관련 항목",
+  );
+  expect(screen.getAllByLabelText("숫자")).toHaveLength(2);
+  fireEvent.change(screen.getAllByLabelText("숫자")[0], {
+    target: { value: "320" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "3. 검수 결과" }));
+  expect(screen.queryByRole("button", { name: /CROSS_VALUE/ })).toBeNull();
+  expect(
+    screen.queryByText("오류", { exact: true, selector: "span" }),
+  ).toBeNull();
+});

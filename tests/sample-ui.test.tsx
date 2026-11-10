@@ -10,7 +10,11 @@ it.skipIf(!process.env.PLANCHECK_XLSX || !process.env.PLANCHECK_DOCX)(
     const fixture = (path: string, name: string) => {
       const bytes = readFileSync(path);
       return Object.assign(new File([bytes], name), {
-        arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+        arrayBuffer: async () =>
+          bytes.buffer.slice(
+            bytes.byteOffset,
+            bytes.byteOffset + bytes.byteLength,
+          ),
       });
     };
     fireEvent.change(screen.getByLabelText(/검토할 Excel/), {
@@ -19,8 +23,9 @@ it.skipIf(!process.env.PLANCHECK_XLSX || !process.env.PLANCHECK_DOCX)(
     fireEvent.change(screen.getByLabelText(/검토할 Word/), {
       target: { files: [fixture(process.env.PLANCHECK_DOCX!, "sample.docx")] },
     });
-    await screen.findByText("원본: sample.xlsx");
-    await screen.findByText(/원본: sample.docx/);
+    // 실제 ZIP/XML 처리 시간은 병렬 테스트의 CPU 부하에 따라 달라진다.
+    await screen.findByText("원본: sample.xlsx", {}, { timeout: 5000 });
+    await screen.findByText(/원본: sample.docx/, {}, { timeout: 5000 });
     expect(screen.getAllByRole("option")).toHaveLength(5);
     expect(screen.getAllByRole("heading", { level: 3 })).toHaveLength(10);
     expect(screen.queryByRole("alert")).toBeNull();
