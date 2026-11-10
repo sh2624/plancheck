@@ -1,10 +1,10 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 @theme {
-  --font-sans: "Pretendard Variable", Pretendard, sans-serif;
-  --font-mono: "Pretendard Variable", Pretendard, sans-serif;
+  --font-sans: 'Pretendard Variable', Pretendard, sans-serif;
+  --font-mono: 'Pretendard Variable', Pretendard, sans-serif;
 }
 :root {
-  font-family: "Pretendard Variable", Pretendard, sans-serif;
+  font-family: 'Pretendard Variable', Pretendard, sans-serif;
   color: #172b43;
   background: #f5f6f8;
   font-synthesis: none;
@@ -109,7 +109,7 @@ h3 {
   font-size: 13px;
   margin-bottom: 10px;
 }
-input[type="file"] {
+input[type='file'] {
   display: block;
   max-width: 100%;
   font-size: 0;
@@ -526,7 +526,7 @@ footer {
   font-size: 12px;
 }
 .planning-editor select,
-.planning-editor input:not([type="checkbox"]) {
+.planning-editor input:not([type='checkbox']) {
   display: block;
   width: 100%;
   max-width: 100%;
@@ -588,7 +588,7 @@ footer {
   display: block;
   margin-bottom: 8px;
 }
-.recommendation-detail input:not([type="checkbox"]),
+.recommendation-detail input:not([type='checkbox']),
 .recommendation-detail select {
   display: block;
   max-width: 100%;
@@ -851,7 +851,7 @@ footer {
 .preparation-list li button {
   flex-shrink: 0;
 }
-.steps [aria-current="step"] {
+.steps [aria-current='step'] {
   outline: 2px solid #183553;
   outline-offset: 3px;
 }
@@ -1163,7 +1163,7 @@ main {
   display: block;
   min-width: 0;
 }
-.inline-conditions input:not([type="checkbox"]),
+.inline-conditions input:not([type='checkbox']),
 .inline-conditions select {
   display: block;
   width: 100%;
@@ -1285,13 +1285,13 @@ main {
   font-size: 12px;
   margin: 8px 0;
 }
-.finding[data-tier="상세 분석 기록"] {
+.finding[data-tier='상세 분석 기록'] {
   padding-block: 16px;
 }
-.finding[data-tier="상세 분석 기록"] .finding-values strong {
+.finding[data-tier='상세 분석 기록'] .finding-values strong {
   font-size: 16px;
 }
-.finding[data-tier="상세 분석 기록"] .finding-heading h3 {
+.finding[data-tier='상세 분석 기록'] .finding-heading h3 {
   font-size: 15px;
 }
 @media (max-width: 800px) {

@@ -1,29 +1,22 @@
-import type { Candidate, Link } from "../normalization/types";
-import type { Calculation, EvidenceRef, Result } from "../validation/types";
-import { ruleTitles } from "../validation/types";
-import type { Planning } from "../planning/types";
-import {
-  discoverCalculation,
-  discoverCross,
-  validateAll,
-} from "../validation/engine";
-import { discoverPlanning, validatePlanning } from "../planning/engine";
-import { recommend } from "../recommendations/recommend";
-import type { Recommendation } from "../recommendations/types";
-import { loanIdentity } from "../recommendations/recommend";
-import { fieldLabels } from "../normalization/types";
-import { presentResult } from "../presentation/results";
-import { formatFinancial } from "../presentation/format";
-import {
-  assessRelationship,
-  type RelationshipAssessment,
-} from "../normalization/relationships";
+import type { Candidate, Link } from '../normalization/types';
+import type { Calculation, EvidenceRef, Result } from '../validation/types';
+import { ruleTitles } from '../validation/types';
+import type { Planning } from '../planning/types';
+import { discoverCalculation, discoverCross, validateAll } from '../validation/engine';
+import { discoverPlanning, validatePlanning } from '../planning/engine';
+import { recommend } from '../recommendations/recommend';
+import type { Recommendation } from '../recommendations/types';
+import { loanIdentity } from '../recommendations/recommend';
+import { fieldLabels } from '../normalization/types';
+import { presentResult } from '../presentation/results';
+import { formatFinancial } from '../presentation/format';
+import { assessRelationship, type RelationshipAssessment } from '../normalization/relationships';
 export type Finding = {
   relationship?: RelationshipAssessment;
   id: string;
-  kind: Recommendation["kind"];
+  kind: Recommendation['kind'];
   title: string;
-  signal: "수치 차이" | "조건 확인" | "수치 일치";
+  signal: '수치 차이' | '조건 확인' | '수치 일치';
   result: Result;
   recommendation?: Recommendation;
   primary: boolean;
@@ -42,134 +35,108 @@ export function inspectDocuments(input: InspectionInput): Finding[] {
   const { items, links, calculations, planning, references } = input;
   // 부적합 관계도 분석 기록으로 남기되 비교 엔진이나 승인 후보에는 전달하지 않는다.
   const suggestions = recommend(items, links, planning, references, true);
-  const final = [
-    ...validateAll(items, links, calculations),
-    ...validatePlanning(items, planning),
-  ];
+  const final = [...validateAll(items, links, calculations), ...validatePlanning(items, planning)];
   const proposed = {
     ...planning,
     allocations: [
       ...planning.allocations,
-      ...suggestions.flatMap((r) =>
-        r.allocation &&
-        !planning.allocations.some((a) => a.id === r.allocation!.id)
-          ? [r.allocation]
-          : [],
-      ),
+      ...suggestions.flatMap((r) => (r.allocation && !planning.allocations.some((a) => a.id === r.allocation!.id) ? [r.allocation] : [])),
     ],
   };
   const planningResults = discoverPlanning(items, proposed);
   const out: Finding[] = [];
   function append(r: Result, rec?: Recommendation) {
-    const kind: Finding["kind"] = r.code.startsWith("CALC")
-      ? "CALC"
-      : r.code.startsWith("CROSS")
-        ? "CROSS"
-        : r.code.startsWith("ALLOC")
-          ? "ALLOC"
-          : "PLAN";
-    const tolerance = r.unit === "원" ? 1 : 1e-8;
-    const signal =
-      r.difference === null
-        ? "조건 확인"
-        : Math.abs(r.difference) > tolerance
-          ? "수치 차이"
-          : "수치 일치";
+    const kind: Finding['kind'] = r.code.startsWith('CALC')
+      ? 'CALC'
+      : r.code.startsWith('CROSS')
+        ? 'CROSS'
+        : r.code.startsWith('ALLOC')
+          ? 'ALLOC'
+          : 'PLAN';
+    const tolerance = r.unit === '원' ? 1 : 1e-8;
+    const signal = r.difference === null ? '조건 확인' : Math.abs(r.difference) > tolerance ? '수치 차이' : '수치 일치';
     const a = r.evidence[0];
     const name = a
-      ? a.field.startsWith("loan")
-        ? `${loanIdentity(a) || "대출"} ${a.field === "loanRate" ? "금리" : a.field === "loanBalance" ? "잔액" : fieldLabels[a.field]}`
+      ? a.field.startsWith('loan')
+        ? `${loanIdentity(a) || '대출'} ${a.field === 'loanRate' ? '금리' : a.field === 'loanBalance' ? '잔액' : fieldLabels[a.field]}`
         : fieldLabels[a.field]
       : r.title;
     const title =
-      kind === "CROSS"
-        ? signal === "수치 차이"
-          ? `${name} 수치가 두 문서에서 ${formatFinancial(Math.abs(r.difference!), r.unit === "%" ? "%p" : r.unit, { difference: true })} 다릅니다`
-          : signal === "수치 일치"
+      kind === 'CROSS'
+        ? signal === '수치 차이'
+          ? `${name} 수치가 두 문서에서 ${formatFinancial(Math.abs(r.difference!), r.unit === '%' ? '%p' : r.unit, { difference: true })} 다릅니다`
+          : signal === '수치 일치'
             ? `${name} 수치가 일치하는 후보입니다`
             : `${name} 비교 조건을 확인해 주세요`
-        : kind === "CALC"
-          ? signal === "수치 차이"
+        : kind === 'CALC'
+          ? signal === '수치 차이'
             ? `${r.title}의 문서값과 추천 계산값이 다릅니다`
             : `${r.title}의 계산 범위를 확인해 주세요`
-          : kind === "ALLOC"
-            ? signal === "수치 차이" && r.difference! > 0
-              ? "동일 자산의 동시 배정액이 보유액을 초과하는 후보입니다"
-              : "동일 자산의 배정 관계와 사용 시점을 확인해 주세요"
-            : r.code === "PLAN_CONDITIONAL"
-              ? "조건부 금액이 현재 자금에 포함됐는지 확인해 주세요"
-              : "제안과 실행 행동의 대상·기간을 확인해 주세요";
+          : kind === 'ALLOC'
+            ? signal === '수치 차이' && r.difference! > 0
+              ? '동일 자산의 동시 배정액이 보유액을 초과하는 후보입니다'
+              : '동일 자산의 배정 관계와 사용 시점을 확인해 주세요'
+            : r.code === 'PLAN_CONDITIONAL'
+              ? '조건부 금액이 현재 자금에 포함됐는지 확인해 주세요'
+              : '제안과 실행 행동의 대상·기간을 확인해 주세요';
     const approved = final.find((f) => {
       if (rec?.link)
         return (
-          f.id.startsWith("cross:") &&
-          links.some(
-            (l) =>
-              f.id === `cross:${l.id}` &&
-              l.xlsxId === rec.link!.xlsxId &&
-              l.docxId === rec.link!.docxId,
-          ) &&
+          f.id.startsWith('cross:') &&
+          links.some((l) => f.id === `cross:${l.id}` && l.xlsxId === rec.link!.xlsxId && l.docxId === rec.link!.docxId) &&
           f.evidence.every((c) => c.confirmed)
         );
       if (rec?.calculation)
         return (
           f.id === `calc:${rec.calculation.id}` &&
-          calculations.some(
-            (c) => c.id === rec.calculation!.id && c.scopeConfirmed,
-          ) &&
+          calculations.some((c) => c.id === rec.calculation!.id && c.scopeConfirmed) &&
           f.evidence.every((c) => c.confirmed)
         );
-      return f.id === r.id && (f.status === "오류" || f.status === "검증 통과");
+      return f.id === r.id && (f.status === '오류' || f.status === '검증 통과');
     });
     const questions = [
-      ...(kind === "CROSS"
-        ? ["두 값이 같은 대상·같은 기준일·같은 시나리오의 값인가요?"]
-        : kind === "CALC"
-          ? ["추천된 구성에 누락이나 소계 중복이 없고 적용 기간이 같은가요?"]
+      ...(kind === 'CROSS'
+        ? ['두 값이 같은 대상·같은 기준일·같은 시나리오의 값인가요?']
+        : kind === 'CALC'
+          ? ['추천된 구성에 누락이나 소계 중복이 없고 적용 기간이 같은가요?']
           : []),
       ...r.needs,
       ...(rec?.risks ?? []),
     ];
     out.push({
-      id: kind === "PLAN" || kind === "ALLOC" ? r.id : (rec?.id ?? r.id),
+      id: kind === 'PLAN' || kind === 'ALLOC' ? r.id : (rec?.id ?? r.id),
       kind,
       title: approved ? presentResult(approved).headline : title,
       signal,
       result: r,
       recommendation: rec,
       approved,
-      primary:
-        rec?.primary ??
-        (r.id.startsWith("actions:") ||
-          r.code === "ALLOC_CAPACITY" ||
-          r.actual !== null),
+      primary: rec?.primary ?? (r.id.startsWith('actions:') || r.code === 'ALLOC_CAPACITY' || r.actual !== null),
       questions: [...new Set(questions)],
     });
   }
   for (const rec of suggestions) {
     if (rec.link) {
-      const pair = rec.candidateIds.map((id) =>
-        items.find((c) => c.id === id)!,
-      );
+      const pair = rec.candidateIds.map((id) => items.find((c) => c.id === id)!);
       const relationship = assessRelationship(pair[0], pair[1]);
       if (relationship.blocked) {
         const r: Result = {
           id: rec.id,
-          code: "CROSS_VALUE",
-          title: "연결 범위 확인",
-          status: "검증 불가",
+          code: 'CROSS_VALUE',
+          title: '연결 범위 확인',
+          status: '검증 불가',
           evidence: pair,
           actual: null,
           expected: null,
           difference: null,
-          unit: "",
-          basis: relationship.reasons.join(" "),
+          unit: '',
+          basis: relationship.reasons.join(' '),
           needs: relationship.reasons,
         };
         append(r);
         Object.assign(out[out.length - 1], {
           id: rec.id,
-          title: "서로 다른 항목·범위의 연결은 비교에서 제외했습니다",
+          title: '서로 다른 항목·범위의 연결은 비교에서 제외했습니다',
           relationship,
           questions: relationship.reasons,
           primary: false,
@@ -185,21 +152,16 @@ export function inspectDocuments(input: InspectionInput): Finding[] {
               id: `calc:${rec.calculation.id}`,
               code: `CALC_${rec.calculation.rule.toUpperCase()}`,
               title: ruleTitles[rec.calculation.rule],
-              status: "검증 불가",
+              status: '검증 불가',
               evidence: items.filter((c) => rec.candidateIds.includes(c.id)),
               actual: null,
               expected: null,
               difference: null,
-              unit: "원",
-              basis:
-                "추천 구성에 명확한 범위·분류 문제가 있어 자동 계산을 보류합니다.",
+              unit: '원',
+              basis: '추천 구성에 명확한 범위·분류 문제가 있어 자동 계산을 보류합니다.',
               needs: rec.scopeIssues,
             }
-          : discoverCalculation(
-              items,
-              calculations.find((c) => c.id === rec.calculation!.id) ??
-                rec.calculation,
-            ),
+          : discoverCalculation(items, calculations.find((c) => c.id === rec.calculation!.id) ?? rec.calculation),
         rec,
       );
   }
@@ -209,44 +171,26 @@ export function inspectDocuments(input: InspectionInput): Finding[] {
         (s.planFocus &&
           (r.id === `fund:${s.planFocus.id}` ||
             r.id === `action:${s.planFocus.id}` ||
-            (s.planFocus.kind === "actions" &&
-              (r.id.startsWith(`actions:${s.planFocus.id}:`) ||
-                r.id.endsWith(`:${s.planFocus.id}`))) ||
-            (s.planFocus.kind === "allocations" &&
+            (s.planFocus.kind === 'actions' && (r.id.startsWith(`actions:${s.planFocus.id}:`) || r.id.endsWith(`:${s.planFocus.id}`))) ||
+            (s.planFocus.kind === 'allocations' &&
               planning.allocations.some(
-                (a) =>
-                  a.id === s.planFocus!.id &&
-                  r.id ===
-                    `alloc:${JSON.stringify([a.assetId, a.scenario.trim(), a.funding])}`,
+                (a) => a.id === s.planFocus!.id && r.id === `alloc:${JSON.stringify([a.assetId, a.scenario.trim(), a.funding])}`,
               )))) ||
         (s.allocation &&
           r.references?.some((ref) =>
-            s.references.some(
-              (x) =>
-                x.source === ref.source &&
-                x.fileName === ref.fileName &&
-                x.location === ref.location,
-            ),
+            s.references.some((x) => x.source === ref.source && x.fileName === ref.fileName && x.location === ref.location),
           )),
     );
     append(r, rec);
   }
   // 수동 구성만 존재하는 확정 결과도 자동 추천 목록에 가리지 않는다.
-  for (const f of final.filter(
-    (r) => r.status === "오류" || r.status === "검증 통과",
-  ))
+  for (const f of final.filter((r) => r.status === '오류' || r.status === '검증 통과'))
     if (!out.some((x) => x.approved?.id === f.id))
       out.push({
         id: `final:${f.id}`,
-        kind: f.code.startsWith("CALC")
-          ? "CALC"
-          : f.code.startsWith("CROSS")
-            ? "CROSS"
-            : f.code.startsWith("ALLOC")
-              ? "ALLOC"
-              : "PLAN",
+        kind: f.code.startsWith('CALC') ? 'CALC' : f.code.startsWith('CROSS') ? 'CROSS' : f.code.startsWith('ALLOC') ? 'ALLOC' : 'PLAN',
         title: presentResult(f).headline,
-        signal: f.difference ? "수치 차이" : "조건 확인",
+        signal: f.difference ? '수치 차이' : '조건 확인',
         result: f,
         approved: f,
         primary: true,
@@ -255,7 +199,7 @@ export function inspectDocuments(input: InspectionInput): Finding[] {
   return out.sort(
     (a, b) =>
       Number(!!b.approved) - Number(!!a.approved) ||
-      Number(b.signal === "수치 차이") - Number(a.signal === "수치 차이") ||
+      Number(b.signal === '수치 차이') - Number(a.signal === '수치 차이') ||
       Number(b.primary) - Number(a.primary),
   );
 }

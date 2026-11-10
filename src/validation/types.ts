@@ -1,19 +1,19 @@
-﻿import type { Candidate, Field } from "../normalization/types";
+﻿import type { Candidate, Field } from '../normalization/types';
 export const ruleTitles = {
-  assets: "총자산 합계",
-  debt: "총부채 합계",
-  net: "순자산",
-  surplus: "월 잉여금",
-  loan: "대출 월 상환액",
+  assets: '총자산 합계',
+  debt: '총부채 합계',
+  net: '순자산',
+  surplus: '월 잉여금',
+  loan: '대출 월 상환액',
 } as const;
 export type Rule = keyof typeof ruleTitles;
 export type EvidenceRef = {
-  source: Candidate["source"];
+  source: Candidate['source'];
   fileName: string;
   location: string;
   originalText: string;
 };
-export type Status = "오류" | "확인 필요" | "검증 통과" | "검증 불가";
+export type Status = '오류' | '확인 필요' | '검증 통과' | '검증 불가';
 export type Calculation = {
   id: string;
   rule: Rule;
@@ -21,9 +21,9 @@ export type Calculation = {
   groups: Record<string, string[]>;
   scopeConfirmed: boolean;
   tolerance: string;
-  loanMethod: "미확인" | "원리금균등" | "기타";
+  loanMethod: '미확인' | '원리금균등' | '기타';
   graceMonths: string;
-  loanBasis: "미확인" | "최초 원금·전체 기간" | "현재 잔액·잔여 기간";
+  loanBasis: '미확인' | '최초 원금·전체 기간' | '현재 잔액·잔여 기간';
 };
 export type Result = {
   id: string;
@@ -47,66 +47,66 @@ export const rules: Record<
   }
 > = {
   assets: {
-    target: "totalAssets",
+    target: 'totalAssets',
     groups: [
       {
-        key: "parts",
-        label: "자산 구성 항목 (합계·소계와 중복 선택 금지)",
-        fields: ["deposit", "etf", "pension", "housingDeposit"],
+        key: 'parts',
+        label: '자산 구성 항목 (합계·소계와 중복 선택 금지)',
+        fields: ['deposit', 'etf', 'pension', 'housingDeposit'],
         many: true,
       },
     ],
   },
   debt: {
-    target: "totalDebt",
+    target: 'totalDebt',
     groups: [
       {
-        key: "parts",
-        label: "부채 잔액 항목",
-        fields: ["loanBalance"],
+        key: 'parts',
+        label: '부채 잔액 항목',
+        fields: ['loanBalance'],
         many: true,
       },
     ],
   },
   net: {
-    target: "netAssets",
+    target: 'netAssets',
     groups: [
-      { key: "assets", label: "총자산", fields: ["totalAssets"], many: false },
-      { key: "debt", label: "총부채", fields: ["totalDebt"], many: false },
+      { key: 'assets', label: '총자산', fields: ['totalAssets'], many: false },
+      { key: 'debt', label: '총부채', fields: ['totalDebt'], many: false },
     ],
   },
   surplus: {
-    target: "surplus",
+    target: 'surplus',
     groups: [
-      { key: "income", label: "월 소득", fields: ["income"], many: false },
+      { key: 'income', label: '월 소득', fields: ['income'], many: false },
       {
-        key: "expense",
-        label: "월 지출 (대출 상환 포함 여부 확인)",
-        fields: ["fixedExpense", "variableExpense", "loanPayment"],
+        key: 'expense',
+        label: '월 지출 (대출 상환 포함 여부 확인)',
+        fields: ['fixedExpense', 'variableExpense', 'loanPayment'],
         many: true,
       },
       {
-        key: "savings",
-        label: "월 저축·투자",
-        fields: ["savings"],
+        key: 'savings',
+        label: '월 저축·투자',
+        fields: ['savings'],
         many: true,
       },
     ],
   },
   loan: {
-    target: "loanPayment",
+    target: 'loanPayment',
     groups: [
       {
-        key: "principal",
-        label: "약정 원금 또는 현재 잔액",
-        fields: ["loanPrincipal", "loanBalance"],
+        key: 'principal',
+        label: '약정 원금 또는 현재 잔액',
+        fields: ['loanPrincipal', 'loanBalance'],
         many: false,
       },
-      { key: "rate", label: "연금리 (%)", fields: ["loanRate"], many: false },
+      { key: 'rate', label: '연금리 (%)', fields: ['loanRate'], many: false },
       {
-        key: "term",
-        label: "전체 또는 잔여 상환기간",
-        fields: ["loanTerm"],
+        key: 'term',
+        label: '전체 또는 잔여 상환기간',
+        fields: ['loanTerm'],
         many: false,
       },
     ],
@@ -117,12 +117,12 @@ export function newCalculation(rule: Rule, id: string): Calculation {
   return {
     id,
     rule,
-    targetId: "",
+    targetId: '',
     groups: {},
     scopeConfirmed: false,
-    tolerance: "1",
-    loanMethod: "미확인",
-    graceMonths: "",
-    loanBasis: "미확인",
+    tolerance: '1',
+    loanMethod: '미확인',
+    graceMonths: '',
+    loanBasis: '미확인',
   };
 }

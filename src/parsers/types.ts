@@ -13,7 +13,7 @@ export type Workbook = {
   sheets: { name: string; cells: Cell[]; merges: string[] }[];
 };
 export type Paragraph = {
-  kind: "paragraph";
+  kind: 'paragraph';
   location: string;
   text: string;
   numbers: string[];
@@ -25,7 +25,7 @@ export type WordCell = {
   text: string;
   paragraphs: Paragraph[];
 };
-export type WordTable = { kind: "table"; location: string; rows: WordCell[][] };
+export type WordTable = { kind: 'table'; location: string; rows: WordCell[][] };
 export type WordDocument = {
   fileName: string;
   blocks: (Paragraph | WordTable)[];

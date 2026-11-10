@@ -1,12 +1,12 @@
-import { useState, useRef, useEffect } from "react";
-import type { Candidate, Link } from "../normalization/types";
-import { fieldLabels, units } from "../normalization/types";
-import { canConfirm } from "../normalization/values";
-import type { Calculation } from "../validation/types";
-import { rules } from "../validation/types";
-import type { Recommendation } from "../recommendations/types";
-import { Button } from "./ui/button";
-import { formatFinancial } from "../presentation/format";
+import { useState, useRef, useEffect } from 'react';
+import type { Candidate, Link } from '../normalization/types';
+import { fieldLabels, units } from '../normalization/types';
+import { canConfirm } from '../normalization/values';
+import type { Calculation } from '../validation/types';
+import { rules } from '../validation/types';
+import type { Recommendation } from '../recommendations/types';
+import { Button } from './ui/button';
+import { formatFinancial } from '../presentation/format';
 type Props = {
   focus?: { id: string; kind: string };
   recommendations: Recommendation[];
@@ -24,55 +24,34 @@ export function RecommendationCenter(props: Props) {
   const root = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
     if (props.focus) {
-      root.current?.scrollIntoView?.({ block: "start" });
-      root.current?.querySelector("summary")?.focus();
+      root.current?.scrollIntoView?.({ block: 'start' });
+      root.current?.querySelector('summary')?.focus();
     }
   }, [props.focus]);
-  const [kind, setKind] = useState(props.focus?.kind ?? "전체"),
+  const [kind, setKind] = useState(props.focus?.kind ?? '전체'),
     [extra, setExtra] = useState(!!props.focus),
-    [selected, setSelected] = useState(props.focus?.id ?? ""),
+    [selected, setSelected] = useState(props.focus?.id ?? ''),
     [page, setPage] = useState(0),
     [open, setOpen] = useState(true);
   const visible = recommendations.filter(
-    (r) =>
-      (kind === "전체" || r.kind === kind) &&
-      (extra || r.primary || kind === "PLAN" || kind === "ALLOC"),
+    (r) => (kind === '전체' || r.kind === kind) && (extra || r.primary || kind === 'PLAN' || kind === 'ALLOC'),
   );
-  const currentPage = Math.min(
-      page,
-      Math.max(0, Math.ceil(visible.length / 10) - 1),
-    ),
+  const currentPage = Math.min(page, Math.max(0, Math.ceil(visible.length / 10) - 1)),
     detail = recommendations.find((r) => r.id === selected);
   function state(r: Recommendation) {
-    if (r.planFocus && r.reviewed) return "구조화 확인됨";
-    if (
-      r.link &&
-      links.some(
-        (l) => l.xlsxId === r.link!.xlsxId && l.docxId === r.link!.docxId,
-      )
-    )
-      return "연결 승인됨";
+    if (r.planFocus && r.reviewed) return '구조화 확인됨';
+    if (r.link && links.some((l) => l.xlsxId === r.link!.xlsxId && l.docxId === r.link!.docxId)) return '연결 승인됨';
     if (r.calculation) {
       const c = calculations.find((c) => c.id === r.calculation!.id);
-      if (c)
-        return c.scopeConfirmed ? "범위 승인됨" : "구성 적용됨 · 확인 필요";
+      if (c) return c.scopeConfirmed ? '범위 승인됨' : '구성 적용됨 · 확인 필요';
     }
-    return "미승인 추천";
+    return '미승인 추천';
   }
   return (
-    <details
-      ref={root}
-      className="recommendation-center"
-      open={open}
-      onToggle={(e) => setOpen(e.currentTarget.open)}
-    >
-      <summary>
-        자동 검증 후보 추천 · 핵심{" "}
-        {recommendations.filter((r) => r.primary).length}건
-      </summary>
+    <details ref={root} className="recommendation-center" open={open} onToggle={(e) => setOpen(e.currentTarget.open)}>
+      <summary>자동 검증 후보 추천 · 핵심 {recommendations.filter((r) => r.primary).length}건</summary>
       <p className="notice">
-        추천 신뢰도는 사용자 확인과 다릅니다. 원문과 기준을 확인한 항목만
-        승인하세요. 숫자가 같은지는 연결 기준에 사용하지 않으며,
+        추천 신뢰도는 사용자 확인과 다릅니다. 원문과 기준을 확인한 항목만 승인하세요. 숫자가 같은지는 연결 기준에 사용하지 않으며,
         가정·조건부·다른 시점은 승인 후에도 보류될 수 있습니다.
       </p>
       <div className="recommendation-filters">
@@ -82,11 +61,11 @@ export function RecommendationCenter(props: Props) {
             value={kind}
             onChange={(e) => {
               setKind(e.target.value);
-              setSelected("");
+              setSelected('');
               setPage(0);
             }}
           >
-            {["전체", "CALC", "CROSS", "ALLOC", "PLAN"].map((x) => (
+            {['전체', 'CALC', 'CROSS', 'ALLOC', 'PLAN'].map((x) => (
               <option key={x}>{x}</option>
             ))}
           </select>
@@ -97,7 +76,7 @@ export function RecommendationCenter(props: Props) {
             checked={extra}
             onChange={(e) => {
               setExtra(e.target.checked);
-              setSelected("");
+              setSelected('');
               setPage(0);
             }}
           />
@@ -117,51 +96,33 @@ export function RecommendationCenter(props: Props) {
             </tr>
           </thead>
           <tbody>
-            {visible
-              .slice(currentPage * 10, (currentPage + 1) * 10)
-              .map((r) => (
-                <tr key={r.id}>
-                  <td>
-                    <Button variant="outline" onClick={() => setSelected(r.id)}>
-                      {r.kind} · {r.title}
-                    </Button>
-                  </td>
-                  <td>
-                    {r.confidence}
-                    <br />
-                    {state(r)}
-                  </td>
-                  <td>
-                    {r.missing.slice(0, 2).join(" · ") ||
-                      r.risks.slice(0, 2).join(" · ")}
-                  </td>
-                </tr>
-              ))}
+            {visible.slice(currentPage * 10, (currentPage + 1) * 10).map((r) => (
+              <tr key={r.id}>
+                <td>
+                  <Button variant="outline" onClick={() => setSelected(r.id)}>
+                    {r.kind} · {r.title}
+                  </Button>
+                </td>
+                <td>
+                  {r.confidence}
+                  <br />
+                  {state(r)}
+                </td>
+                <td>{r.missing.slice(0, 2).join(' · ') || r.risks.slice(0, 2).join(' · ')}</td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
-      {!visible.length && (
-        <p className="empty">
-          표시할 핵심 추천이 없습니다. 파일을 업로드하거나 추가·불확실 후보를
-          확인하세요.
-        </p>
-      )}
+      {!visible.length && <p className="empty">표시할 핵심 추천이 없습니다. 파일을 업로드하거나 추가·불확실 후보를 확인하세요.</p>}
       <div className="pagination">
-        <Button
-          variant="outline"
-          disabled={!currentPage}
-          onClick={() => setPage(currentPage - 1)}
-        >
+        <Button variant="outline" disabled={!currentPage} onClick={() => setPage(currentPage - 1)}>
           이전 추천
         </Button>
         <span>
           {currentPage + 1} / {Math.max(1, Math.ceil(visible.length / 10))}
         </span>
-        <Button
-          variant="outline"
-          disabled={(currentPage + 1) * 10 >= visible.length}
-          onClick={() => setPage(currentPage + 1)}
-        >
+        <Button variant="outline" disabled={(currentPage + 1) * 10 >= visible.length} onClick={() => setPage(currentPage + 1)}>
           다음 추천
         </Button>
       </div>
@@ -193,9 +154,7 @@ export function RecommendationDetail({
   headline?: string;
 }) {
   const [ack, setAck] = useState(false);
-  const members = r.candidateIds
-    .map((id) => items.find((c) => c.id === id))
-    .filter((c): c is Candidate => !!c);
+  const members = r.candidateIds.map((id) => items.find((c) => c.id === id)).filter((c): c is Candidate => !!c);
   const valid =
     !r.scopeIssues?.length &&
     members.length > 0 &&
@@ -203,9 +162,7 @@ export function RecommendationDetail({
     members.every(canConfirm) &&
     (!r.calculation ||
       rules[r.calculation.rule].groups.every(
-        (g) =>
-          (r.calculation!.groups[g.key]?.length ?? 0) > 0 &&
-          (g.many || r.calculation!.groups[g.key].length === 1),
+        (g) => (r.calculation!.groups[g.key]?.length ?? 0) > 0 && (g.many || r.calculation!.groups[g.key].length === 1),
       ));
   const edit = (id: string, patch: Partial<Candidate>) => {
     setAck(false);
@@ -243,20 +200,16 @@ export function RecommendationDetail({
                     <details>
                       <summary>원본 문맥</summary>
                       <p className="pre">{c.originalText}</p>
-                      <p>원본 숫자: {c.originalNumber ?? "없음"}</p>
+                      <p>원본 숫자: {c.originalNumber ?? '없음'}</p>
                     </details>
                     <small>
-                      {c.confidence} ·{" "}
-                      {c.confirmed ? "사용자 확인됨" : "사용자 미확인"}
+                      {c.confidence} · {c.confirmed ? '사용자 확인됨' : '사용자 미확인'}
                     </small>
                   </td>
                   <td>
                     <label>
                       추천 숫자
-                      <input
-                        value={c.number}
-                        onChange={(e) => edit(c.id, { number: e.target.value })}
-                      />
+                      <input value={c.number} onChange={(e) => edit(c.id, { number: e.target.value })} />
                     </label>
                     <label>
                       추천 단위
@@ -264,7 +217,7 @@ export function RecommendationDetail({
                         value={c.unit}
                         onChange={(e) =>
                           edit(c.id, {
-                            unit: e.target.value as Candidate["unit"],
+                            unit: e.target.value as Candidate['unit'],
                           })
                         }
                       >
@@ -274,40 +227,24 @@ export function RecommendationDetail({
                       </select>
                     </label>
                     <p>
-                      정규화:{" "}
+                      정규화:{' '}
                       {c.normalizedValue === null
-                        ? "확인 필요"
-                        : formatFinancial(
-                            c.normalizedValue,
-                            ["원", "만 원", "억 원"].includes(c.unit)
-                              ? "원"
-                              : c.unit,
-                          )}
+                        ? '확인 필요'
+                        : formatFinancial(c.normalizedValue, ['원', '만 원', '억 원'].includes(c.unit) ? '원' : c.unit)}
                     </p>
                   </td>
                   <td>
                     <label>
                       추천 기준일
-                      <input
-                        value={c.asOf}
-                        onChange={(e) => edit(c.id, { asOf: e.target.value })}
-                      />
+                      <input value={c.asOf} onChange={(e) => edit(c.id, { asOf: e.target.value })} />
                     </label>
                     <label>
                       추천 적용 기간
-                      <input
-                        value={c.period}
-                        onChange={(e) => edit(c.id, { period: e.target.value })}
-                      />
+                      <input value={c.period} onChange={(e) => edit(c.id, { period: e.target.value })} />
                     </label>
                     <label>
                       추천 시나리오
-                      <input
-                        value={c.scenario}
-                        onChange={(e) =>
-                          edit(c.id, { scenario: e.target.value })
-                        }
-                      />
+                      <input value={c.scenario} onChange={(e) => edit(c.id, { scenario: e.target.value })} />
                     </label>
                     <label>
                       추천 확정 여부
@@ -315,11 +252,11 @@ export function RecommendationDetail({
                         value={c.certainty}
                         onChange={(e) =>
                           edit(c.id, {
-                            certainty: e.target.value as Candidate["certainty"],
+                            certainty: e.target.value as Candidate['certainty'],
                           })
                         }
                       >
-                        {["미확인", "확정", "가정", "조건부"].map((x) => (
+                        {['미확인', '확정', '가정', '조건부'].map((x) => (
                           <option key={x}>{x}</option>
                         ))}
                       </select>
@@ -342,20 +279,11 @@ export function RecommendationDetail({
       {(r.calculation || r.link) && (
         <>
           <label className="scope-confirm">
-            <input
-              type="checkbox"
-              checked={ack}
-              onChange={(e) => setAck(e.target.checked)}
-            />
+            <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} />
             선택 원문의 수치·단위·항목 의미
-            {r.link
-              ? "와 동일 항목 연결"
-              : " 및 구성 범위의 누락·소계 중복 여부"}
-            를 검토했습니다. 기준일·시나리오·확정 여부는 위 입력 상태를
-            유지합니다.
-            {r.calculation?.rule === "loan"
-              ? " 같은 대출의 고정금리·거치기간·원금/잔여기간 기준도 확인했습니다."
-              : ""}
+            {r.link ? '와 동일 항목 연결' : ' 및 구성 범위의 누락·소계 중복 여부'}를 검토했습니다. 기준일·시나리오·확정 여부는 위 입력
+            상태를 유지합니다.
+            {r.calculation?.rule === 'loan' ? ' 같은 대출의 고정금리·거치기간·원금/잔여기간 기준도 확인했습니다.' : ''}
           </label>
           <div className="steps">
             {r.calculation && (
@@ -381,11 +309,9 @@ export function RecommendationDetail({
             해당 데이터 확인 화면으로 이동
           </Button>
         )}
-        {(r.kind === "PLAN" || r.kind === "ALLOC") && (
+        {(r.kind === 'PLAN' || r.kind === 'ALLOC') && (
           <Button variant="outline" onClick={() => onPlan(r)}>
-            {r.allocation
-              ? "배정 후보 가져와 조건 확인"
-              : "구조화 조건 확인으로 이동"}
+            {r.allocation ? '배정 후보 가져와 조건 확인' : '구조화 조건 확인으로 이동'}
           </Button>
         )}
       </div>

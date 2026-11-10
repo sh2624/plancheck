@@ -12,9 +12,12 @@ npm run dev
 npm test
 npm run build
 npm run lint
+npm run format:check
 ```
 
 PowerShell 실행 정책으로 npm.ps1이 차단되면 `npm.cmd`를 사용합니다.
+
+코드 서식은 `.prettierrc`로 관리합니다. 작은따옴표, 들여쓰기 2칸, 줄 너비 140을 사용하며 `npm run format`으로 정리합니다. 원본 금융 문서와 비공개 검사 산출물은 서식 처리에서도 제외합니다.
 
 ## 사용
 

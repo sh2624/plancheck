@@ -1,42 +1,38 @@
-import { useState, useMemo, useRef } from "react";
-import { FileCheck2, LockKeyhole } from "lucide-react";
-import { DocumentPanel } from "./components/DocumentPanel";
-import { WorkbookView } from "./components/WorkbookView";
-import { WordView } from "./components/WordView";
-import { ReviewView } from "./components/ReviewView";
-import { ResultsView } from "./components/ResultsView";
-import { newCalculation, ruleTitles } from "./validation/types";
-import type { Calculation, Rule, Result } from "./validation/types";
-import { Button } from "./components/ui/button";
-import { parseXlsx } from "./parsers/xlsx";
-import { parseDocx } from "./parsers/docx";
-import { extractWorkbook, extractWord } from "./normalization/extract";
-import { editCandidate, canConfirm } from "./normalization/values";
-import { removeLinks } from "./normalization/links";
-import type { Candidate, Link } from "./normalization/types";
-import type { EvidenceRef } from "./validation/types";
-import { emptyPlanning } from "./planning/types";
-import {
-  workbookReferences,
-  wordReferences,
-  replacePlanningSource,
-} from "./planning/extract";
-import { newRecord } from "./planning/types";
-import { recommend } from "./recommendations/recommend";
-import { applyRecommendation } from "./recommendations/apply";
-import type { Recommendation } from "./recommendations/types";
-import { RecommendationCenter } from "./components/RecommendationCenter";
-import { SessionReview } from "./components/SessionReview";
-import type { Documents } from "./session/checkpoint";
-import { StepGuide } from "./components/StepGuide";
-import { DocumentSummary } from "./components/DocumentSummary";
-import { coreCandidates, reviewProgress } from "./presentation/workflow";
-import { validateAll } from "./validation/engine";
-import { validatePlanning } from "./planning/engine";
-import { presentResult } from "./presentation/results";
-import { inspectDocuments } from "./inspection/analyze";
-import { InspectionResults } from "./components/InspectionResults";
-import { assessRelationship } from "./normalization/relationships";
+import { useState, useMemo, useRef } from 'react';
+import { FileCheck2, LockKeyhole } from 'lucide-react';
+import { DocumentPanel } from './components/DocumentPanel';
+import { WorkbookView } from './components/WorkbookView';
+import { WordView } from './components/WordView';
+import { ReviewView } from './components/ReviewView';
+import { ResultsView } from './components/ResultsView';
+import { newCalculation, ruleTitles } from './validation/types';
+import type { Calculation, Rule, Result } from './validation/types';
+import { Button } from './components/ui/button';
+import { parseXlsx } from './parsers/xlsx';
+import { parseDocx } from './parsers/docx';
+import { extractWorkbook, extractWord } from './normalization/extract';
+import { editCandidate, canConfirm } from './normalization/values';
+import { removeLinks } from './normalization/links';
+import type { Candidate, Link } from './normalization/types';
+import type { EvidenceRef } from './validation/types';
+import { emptyPlanning } from './planning/types';
+import { workbookReferences, wordReferences, replacePlanningSource } from './planning/extract';
+import { newRecord } from './planning/types';
+import { recommend } from './recommendations/recommend';
+import { applyRecommendation } from './recommendations/apply';
+import type { Recommendation } from './recommendations/types';
+import { RecommendationCenter } from './components/RecommendationCenter';
+import { SessionReview } from './components/SessionReview';
+import type { Documents } from './session/checkpoint';
+import { StepGuide } from './components/StepGuide';
+import { DocumentSummary } from './components/DocumentSummary';
+import { coreCandidates, reviewProgress } from './presentation/workflow';
+import { validateAll } from './validation/engine';
+import { validatePlanning } from './planning/engine';
+import { presentResult } from './presentation/results';
+import { inspectDocuments } from './inspection/analyze';
+import { InspectionResults } from './components/InspectionResults';
+import { assessRelationship } from './normalization/relationships';
 import {
   applyInlineReview,
   reviewFingerprint,
@@ -44,11 +40,11 @@ import {
   type ReviewDecision,
   type ReviewChoice,
   type InlineAnswers,
-} from "./inspection/review";
+} from './inspection/review';
 /** 원본 추출과 사용자 확인 상태를 관리하며 파일 교체 시 관련 연결을 해제한다. */
 export default function App() {
   const revision = useRef(0);
-  const [step, setStep] = useState<"raw" | "review" | "results">("raw");
+  const [step, setStep] = useState<'raw' | 'review' | 'results'>('raw');
   const [guides, setGuides] = useState({
     raw: true,
     review: true,
@@ -57,9 +53,7 @@ export default function App() {
   const [registered, setRegistered] = useState({ XLSX: false, DOCX: false });
   const [inspectionStarted, setInspectionStarted] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [inlineDecisions, setInlineDecisions] = useState<
-    Record<string, ReviewDecision>
-  >({});
+  const [inlineDecisions, setInlineDecisions] = useState<Record<string, ReviewDecision>>({});
   const [focusIds, setFocusIds] = useState<string[]>([]);
   const [planning, setPlanning] = useState(emptyPlanning);
   const [sourceReferences, setSourceReferences] = useState<EvidenceRef[]>([]);
@@ -75,7 +69,7 @@ export default function App() {
     request: string;
   }>();
   const [planFocus, setPlanFocus] = useState<{
-    kind: "allocations" | "funds" | "actions";
+    kind: 'allocations' | 'funds' | 'actions';
     id: string;
     request: string;
   }>();
@@ -104,61 +98,35 @@ export default function App() {
             const decision = inlineDecisions[f.id];
             return {
               ...f,
-              decision:
-                decision &&
-                decision.fingerprint ===
-                  reviewFingerprint(review.items, decision.candidateIds)
-                  ? decision
-                  : undefined,
+              decision: decision && decision.fingerprint === reviewFingerprint(review.items, decision.candidateIds) ? decision : undefined,
             };
           })
         : [],
-    [
-      inspectionStarted,
-      review,
-      calculations,
-      planning,
-      sourceReferences,
-      inlineDecisions,
-    ],
+    [inspectionStarted, review, calculations, planning, sourceReferences, inlineDecisions],
   );
   const progress = reviewProgress(review.items, coreIds);
   const results = useMemo(
-    () => [
-      ...validateAll(review.items, review.links, calculations),
-      ...validatePlanning(review.items, planning),
-    ],
+    () => [...validateAll(review.items, review.links, calculations), ...validatePlanning(review.items, planning)],
     [review, calculations, planning],
   );
   const pendingResult =
-    results.find(
-      (r) =>
-        r.code === "CROSS_VALUE" &&
-        r.status !== "오류" &&
-        r.status !== "검증 통과",
-    ) ??
-    results.find((r) => r.status === "검증 불가" || r.status === "확인 필요");
+    results.find((r) => r.code === 'CROSS_VALUE' && r.status !== '오류' && r.status !== '검증 통과') ??
+    results.find((r) => r.status === '검증 불가' || r.status === '확인 필요');
   const unapproved = recommendations.find(
     (r) =>
       r.primary &&
       (r.link
-        ? !review.links.some(
-            (l) => l.xlsxId === r.link!.xlsxId && l.docxId === r.link!.docxId,
-          )
+        ? !review.links.some((l) => l.xlsxId === r.link!.xlsxId && l.docxId === r.link!.docxId)
         : r.calculation
-          ? !calculations.some(
-              (c) => c.id === r.calculation!.id && c.scopeConfirmed,
-            )
+          ? !calculations.some((c) => c.id === r.calculation!.id && c.scopeConfirmed)
           : !r.reviewed),
   );
   /** 누락된 파일의 등록 위치로 이동하고 키보드 초점을 맞춘다. */
-  function register(source: "XLSX" | "DOCX") {
-    setStep("raw");
+  function register(source: 'XLSX' | 'DOCX') {
+    setStep('raw');
     requestAnimationFrame(() => {
-      const input = document.getElementById(
-        source === "XLSX" ? "xlsx" : "docx",
-      );
-      input?.scrollIntoView?.({ block: "center" });
+      const input = document.getElementById(source === 'XLSX' ? 'xlsx' : 'docx');
+      input?.scrollIntoView?.({ block: 'center' });
       input?.focus();
     });
   }
@@ -166,45 +134,43 @@ export default function App() {
   function nextAction() {
     if (!registered.XLSX)
       return {
-        text: "Excel 재무표가 없습니다. 먼저 파일을 등록하세요.",
-        label: "Excel 등록",
-        run: () => register("XLSX"),
+        text: 'Excel 재무표가 없습니다. 먼저 파일을 등록하세요.',
+        label: 'Excel 등록',
+        run: () => register('XLSX'),
       };
     if (!registered.DOCX)
       return {
-        text: "Word 보고서를 등록하면 두 문서의 값을 비교할 수 있습니다.",
-        label: "Word 등록",
-        run: () => register("DOCX"),
+        text: 'Word 보고서를 등록하면 두 문서의 값을 비교할 수 있습니다.',
+        label: 'Word 등록',
+        run: () => register('DOCX'),
       };
-    if (step === "raw")
+    if (step === 'raw')
       return {
-        text: "두 문서가 등록됐습니다. 핵심 항목의 값과 원본부터 확인하세요.",
-        label: "데이터 확인으로 이동",
+        text: '두 문서가 등록됐습니다. 핵심 항목의 값과 원본부터 확인하세요.',
+        label: '데이터 확인으로 이동',
         run: () => {
           setFocusIds([]);
-          setStep("review");
+          setStep('review');
         },
       };
-    if (step === "review" && progress.pending.length)
+    if (step === 'review' && progress.pending.length)
       return {
         text: `핵심 확인 대상 ${progress.total}개 중 ${progress.confirmed}개를 확인했습니다. 원문과 단위·기준을 검토해야 오류를 확정할 수 있습니다.`,
-        label: "핵심 확인 항목으로 이동",
+        label: '핵심 확인 항목으로 이동',
         run: () => inspect(progress.pending),
       };
-    if (pendingResult?.status === "확인 필요")
+    if (pendingResult?.status === '확인 필요')
       return {
         text: `${presentResult(pendingResult).headline}: ${presentResult(pendingResult).nextAction}`,
-        label: "동일 기준·조건 확인",
+        label: '동일 기준·조건 확인',
         run: () => prepare(pendingResult),
       };
     if (unapproved)
       return {
         text: `${unapproved.title} — 추천 관계와 적용 기준을 검토한 뒤 승인하세요.`,
-        label: unapproved.calculation
-          ? "계산 구성 항목 확인"
-          : "동일 항목 연결 확인",
+        label: unapproved.calculation ? '계산 구성 항목 확인' : '동일 항목 연결 확인',
         run: () => {
-          setStep("results");
+          setStep('results');
           setRecommendationFocus({
             id: unapproved.id,
             kind: unapproved.kind,
@@ -215,21 +181,21 @@ export default function App() {
     if (pendingResult)
       return {
         text: `${presentResult(pendingResult).headline}: ${presentResult(pendingResult).nextAction}`,
-        label: "필요한 조건 확인",
+        label: '필요한 조건 확인',
         run: () => prepare(pendingResult),
       };
     return {
       text: results.length
-        ? "현재 구성한 검증의 판정 결과를 확인하세요. 추가 항목의 정상 여부를 뜻하지 않습니다."
-        : "검증 후보를 자동으로 찾지 못했습니다. 원본을 검토하고 항목과 검증 구성을 추가하세요.",
-      label: results.length ? "결과 확인" : "항목 확인·추가",
-      run: () => (results.length ? setStep("results") : inspect([])),
+        ? '현재 구성한 검증의 판정 결과를 확인하세요. 추가 항목의 정상 여부를 뜻하지 않습니다.'
+        : '검증 후보를 자동으로 찾지 못했습니다. 원본을 검토하고 항목과 검증 구성을 추가하세요.',
+      label: results.length ? '결과 확인' : '항목 확인·추가',
+      run: () => (results.length ? setStep('results') : inspect([])),
     };
   }
   const next = nextAction();
   function inspect(ids: string[]) {
     setFocusIds(ids);
-    setStep("review");
+    setStep('review');
   }
   function apply(r: Recommendation, approve: boolean) {
     revision.current++;
@@ -241,22 +207,20 @@ export default function App() {
   }
   /** 판정에 사용한 항목과 일치하는 추천 또는 구조화 확인 화면으로 안내한다. */
   function prepare(result: Result) {
-    setStep("results");
+    setStep('results');
     setAdvancedOpen(true);
     const exact = recommendations.find(
       (r) =>
         (r.calculation && `calc:${r.calculation.id}` === result.id) ||
-        (r.link &&
-          result.evidence.some((c) => c.id === r.link!.xlsxId) &&
-          result.evidence.some((c) => c.id === r.link!.docxId)),
+        (r.link && result.evidence.some((c) => c.id === r.link!.xlsxId) && result.evidence.some((c) => c.id === r.link!.docxId)),
     );
-    const kind = result.code.startsWith("CALC")
-      ? "CALC"
-      : result.code.startsWith("CROSS")
-        ? "CROSS"
-        : result.code.startsWith("ALLOC")
-          ? "ALLOC"
-          : "PLAN";
+    const kind = result.code.startsWith('CALC')
+      ? 'CALC'
+      : result.code.startsWith('CROSS')
+        ? 'CROSS'
+        : result.code.startsWith('ALLOC')
+          ? 'ALLOC'
+          : 'PLAN';
     const candidate =
       exact ??
       recommendations.find(
@@ -265,12 +229,7 @@ export default function App() {
           (r.calculation
             ? result.code === `CALC_${r.calculation.rule.toUpperCase()}`
             : r.references.some((ref) =>
-                result.references?.some(
-                  (x) =>
-                    x.source === ref.source &&
-                    x.fileName === ref.fileName &&
-                    x.location === ref.location,
-                ),
+                result.references?.some((x) => x.source === ref.source && x.fileName === ref.fileName && x.location === ref.location),
               )),
       ) ??
       recommendations.find((r) => r.kind === kind);
@@ -278,80 +237,55 @@ export default function App() {
       openPlan(candidate);
       return;
     }
-    if (!candidate && kind === "CALC") {
+    if (!candidate && kind === 'CALC') {
       setCalculationFocus({
-        id: result.id.replace(/^calc:/, ""),
+        id: result.id.replace(/^calc:/, ''),
         request: crypto.randomUUID(),
       });
       return;
     }
     setRecommendationFocus({
-      id: candidate?.id ?? "",
+      id: candidate?.id ?? '',
       kind,
       request: crypto.randomUUID(),
     });
   }
   function openPlan(r: Recommendation) {
-    setStep("results");
+    setStep('results');
     setAdvancedOpen(true);
     revision.current++;
     let focus = r.planFocus;
     if (!focus) {
-      const row = r.allocation ?? newRecord("allocation", crypto.randomUUID());
-      setPlanning((prev) =>
-        prev.allocations.some((a) => a.id === row.id)
-          ? prev
-          : { ...prev, allocations: [row, ...prev.allocations] },
-      );
-      focus = { kind: "allocations", id: row.id };
+      const row = r.allocation ?? newRecord('allocation', crypto.randomUUID());
+      setPlanning((prev) => (prev.allocations.some((a) => a.id === row.id) ? prev : { ...prev, allocations: [row, ...prev.allocations] }));
+      focus = { kind: 'allocations', id: row.id };
     }
     setPlanFocus({ ...focus, request: crypto.randomUUID() });
   }
-  function replaceSource(
-    source: Candidate["source"],
-    next: Candidate[],
-    references: EvidenceRef[] = [],
-    fingerprint?: string,
-  ) {
+  function replaceSource(source: Candidate['source'], next: Candidate[], references: EvidenceRef[] = [], fingerprint?: string) {
     revision.current++;
     setInspectionStarted(false);
     setInlineDecisions({});
     setDocuments((prev) => {
       const nextDocs = { ...prev };
-      if (fingerprint !== undefined || next.length || references.length)
-        nextDocs[source] = fingerprint ?? "";
+      if (fingerprint !== undefined || next.length || references.length) nextDocs[source] = fingerprint ?? '';
       else delete nextDocs[source];
       return nextDocs;
     });
-    const replaced = new Set(
-      review.items.filter((c) => c.source === source).map((c) => c.id),
-    );
-    setSourceReferences((prev) => [
-      ...prev.filter((r) => r.source !== source),
-      ...references,
-    ]);
-    setPlanning((prev) =>
-      replacePlanningSource(prev, source, replaced, references),
-    );
+    const replaced = new Set(review.items.filter((c) => c.source === source).map((c) => c.id));
+    setSourceReferences((prev) => [...prev.filter((r) => r.source !== source), ...references]);
+    setPlanning((prev) => replacePlanningSource(prev, source, replaced, references));
     setCalculations((prev) =>
       prev.map((s) => ({
         ...s,
-        targetId: replaced.has(s.targetId) ? "" : s.targetId,
-        groups: Object.fromEntries(
-          Object.entries(s.groups).map(([key, ids]) => [
-            key,
-            ids.filter((id) => !replaced.has(id)),
-          ]),
-        ),
+        targetId: replaced.has(s.targetId) ? '' : s.targetId,
+        groups: Object.fromEntries(Object.entries(s.groups).map(([key, ids]) => [key, ids.filter((id) => !replaced.has(id))])),
         scopeConfirmed: false,
       })),
     );
     setReview((prev) => ({
       items: [...prev.items.filter((c) => c.source !== source), ...next],
-      links: removeLinks(
-        prev.links,
-        new Set(prev.items.filter((c) => c.source === source).map((c) => c.id)),
-      ),
+      links: removeLinks(prev.links, new Set(prev.items.filter((c) => c.source === source).map((c) => c.id))),
     }));
   }
   function edit(id: string, patch: Partial<Candidate>) {
@@ -360,23 +294,13 @@ export default function App() {
     setPlanning((prev) => ({
       ...prev,
       allocations: prev.allocations.map((r) =>
-        r.assetId === id || r.goalId === id || r.candidateIds.includes(id)
-          ? { ...r, confirmed: false }
-          : r,
+        r.assetId === id || r.goalId === id || r.candidateIds.includes(id) ? { ...r, confirmed: false } : r,
       ),
-      funds: prev.funds.map((r) =>
-        r.candidateIds.includes(id) ? { ...r, confirmed: false } : r,
-      ),
-      actions: prev.actions.map((r) =>
-        r.candidateIds.includes(id) ? { ...r, confirmed: false } : r,
-      ),
+      funds: prev.funds.map((r) => (r.candidateIds.includes(id) ? { ...r, confirmed: false } : r)),
+      actions: prev.actions.map((r) => (r.candidateIds.includes(id) ? { ...r, confirmed: false } : r)),
     }));
     setCalculations((prev) =>
-      prev.map((s) =>
-        s.targetId === id || Object.values(s.groups).flat().includes(id)
-          ? { ...s, scopeConfirmed: false }
-          : s,
-      ),
+      prev.map((s) => (s.targetId === id || Object.values(s.groups).flat().includes(id) ? { ...s, scopeConfirmed: false } : s)),
     );
     setReview((prev) => ({
       items: prev.items.map((c) => (c.id === id ? editCandidate(c, patch) : c)),
@@ -387,25 +311,25 @@ export default function App() {
     revision.current++;
     const item: Candidate = {
       id: crypto.randomUUID(),
-      source: "XLSX",
-      fileName: "직접 입력",
-      location: "직접 입력",
-      originalText: "",
+      source: 'XLSX',
+      fileName: '직접 입력',
+      location: '직접 입력',
+      originalText: '',
       originalNumber: null,
-      label: "새 항목",
-      number: "",
-      unit: "미확인",
+      label: '새 항목',
+      number: '',
+      unit: '미확인',
       normalizedValue: null,
-      field: "unknown",
-      asOf: "",
-      period: "",
-      scenario: "",
-      certainty: "미확인",
+      field: 'unknown',
+      asOf: '',
+      period: '',
+      scenario: '',
+      certainty: '미확인',
       confirmed: false,
       excluded: false,
-      method: "직접 입력",
-      confidence: "확인 필요",
-      note: "원본 문맥을 확인하고 필요한 정보를 입력하세요.",
+      method: '직접 입력',
+      confidence: '확인 필요',
+      note: '원본 문맥을 확인하고 필요한 정보를 입력하세요.',
     };
     setReview((prev) => ({ ...prev, items: [item, ...prev.items] }));
   }
@@ -413,36 +337,20 @@ export default function App() {
     revision.current++;
     setInlineDecisions((prev) => removeDecisions(prev, [a, b]));
     setReview((prev) => {
-      const x = prev.items.find(
-          (c) => c.id === a && !c.excluded && c.source === "XLSX",
-        ),
-        y = prev.items.find(
-          (c) => c.id === b && !c.excluded && c.source === "DOCX",
-        );
-      if (
-        !x ||
-        !y ||
-        x.field !== y.field ||
-        assessRelationship(x, y).blocked ||
-        prev.links.some((l) => l.xlsxId === a && l.docxId === b)
-      )
+      const x = prev.items.find((c) => c.id === a && !c.excluded && c.source === 'XLSX'),
+        y = prev.items.find((c) => c.id === b && !c.excluded && c.source === 'DOCX');
+      if (!x || !y || x.field !== y.field || assessRelationship(x, y).blocked || prev.links.some((l) => l.xlsxId === a && l.docxId === b))
         return prev;
       return {
         ...prev,
-        links: [
-          ...prev.links,
-          { id: crypto.randomUUID(), xlsxId: a, docxId: b },
-        ],
+        links: [...prev.links, { id: crypto.randomUUID(), xlsxId: a, docxId: b }],
       };
     });
   }
   function unlink(id: string) {
     revision.current++;
     const pair = review.links.find((l) => l.id === id);
-    if (pair)
-      setInlineDecisions((prev) =>
-        removeDecisions(prev, [pair.xlsxId, pair.docxId]),
-      );
+    if (pair) setInlineDecisions((prev) => removeDecisions(prev, [pair.xlsxId, pair.docxId]));
     setReview((prev) => ({
       ...prev,
       links: prev.links.filter((l) => l.id !== id),
@@ -452,23 +360,12 @@ export default function App() {
     revision.current++;
     setReview((prev) => ({
       ...prev,
-      items: prev.items.map((c) =>
-        c.id === id && canConfirm(c) ? { ...c, confirmed: true } : c,
-      ),
+      items: prev.items.map((c) => (c.id === id && canConfirm(c) ? { ...c, confirmed: true } : c)),
     }));
   }
   /** 원본을 임의 확정하지 않고 명시적 답변으로 기존 승인 상태를 갱신한다. */
-  function inlineReview(
-    r: Recommendation,
-    choice: ReviewChoice,
-    answers: InlineAnswers,
-  ) {
-    const outcome = applyInlineReview(
-      { ...review, calculations },
-      r,
-      choice,
-      answers,
-    );
+  function inlineReview(r: Recommendation, choice: ReviewChoice, answers: InlineAnswers) {
+    const outcome = applyInlineReview({ ...review, calculations }, r, choice, answers);
     if (!outcome.ok) return outcome.issues;
     revision.current++;
     setReview({ items: outcome.state.items, links: outcome.state.links });
@@ -481,24 +378,15 @@ export default function App() {
       setPlanning((prev) => ({
         ...prev,
         allocations: prev.allocations.map((row) =>
-          outcome.changedIds.some(
-            (id) =>
-              row.assetId === id ||
-              row.goalId === id ||
-              row.candidateIds.includes(id),
-          )
+          outcome.changedIds.some((id) => row.assetId === id || row.goalId === id || row.candidateIds.includes(id))
             ? { ...row, confirmed: false }
             : row,
         ),
         funds: prev.funds.map((row) =>
-          row.candidateIds.some((id) => outcome.changedIds.includes(id))
-            ? { ...row, confirmed: false }
-            : row,
+          row.candidateIds.some((id) => outcome.changedIds.includes(id)) ? { ...row, confirmed: false } : row,
         ),
         actions: prev.actions.map((row) =>
-          row.candidateIds.some((id) => outcome.changedIds.includes(id))
-            ? { ...row, confirmed: false }
-            : row,
+          row.candidateIds.some((id) => outcome.changedIds.includes(id)) ? { ...row, confirmed: false } : row,
         ),
       }));
     setApprovalVersion((v) => v + 1);
@@ -519,64 +407,45 @@ export default function App() {
       </header>
       <main>
         <div className="intro">
-          <h1>
-            {step === "raw"
-              ? "재무설계 문서 검사"
-              : step === "review"
-                ? "상세 검토"
-                : "검사 결과"}
-          </h1>
-          <p>
-            Excel 재무표와 Word 보고서를 대조해 숫자 차이와 계획의 확인 지점을
-            찾습니다.
-          </p>
+          <h1>{step === 'raw' ? '재무설계 문서 검사' : step === 'review' ? '상세 검토' : '검사 결과'}</h1>
+          <p>Excel 재무표와 Word 보고서를 대조해 숫자 차이와 계획의 확인 지점을 찾습니다.</p>
         </div>
         <nav className="steps" aria-label="작업 단계">
           <Button
-            variant={step === "raw" ? "default" : "outline"}
-            aria-pressed={step === "raw"}
-            aria-current={step === "raw" ? "step" : undefined}
-            onClick={() => setStep("raw")}
+            variant={step === 'raw' ? 'default' : 'outline'}
+            aria-pressed={step === 'raw'}
+            aria-current={step === 'raw' ? 'step' : undefined}
+            onClick={() => setStep('raw')}
           >
             1. 검사 시작
           </Button>
           <Button
-            variant={step === "results" ? "default" : "outline"}
-            aria-pressed={step === "results"}
-            aria-current={step === "results" ? "step" : undefined}
-            onClick={() => setStep("results")}
+            variant={step === 'results' ? 'default' : 'outline'}
+            aria-pressed={step === 'results'}
+            aria-current={step === 'results' ? 'step' : undefined}
+            onClick={() => setStep('results')}
           >
             2. 검사 결과
           </Button>
           <Button
-            variant={step === "review" ? "default" : "outline"}
-            aria-pressed={step === "review"}
-            aria-current={step === "review" ? "step" : undefined}
+            variant={step === 'review' ? 'default' : 'outline'}
+            aria-pressed={step === 'review'}
+            aria-current={step === 'review' ? 'step' : undefined}
             onClick={() => {
               setFocusIds([]);
-              setStep("review");
+              setStep('review');
             }}
           >
             3. 상세 검토 ({review.items.filter((c) => !c.excluded).length})
           </Button>
         </nav>
         <p className="muted">
-          3단계 중 {step === "raw" ? 1 : step === "review" ? 3 : 2}단계 ·{" "}
-          {step === "raw"
-            ? "검사 시작"
-            : step === "review"
-              ? "상세 검토"
-              : "검사 결과"}
+          3단계 중 {step === 'raw' ? 1 : step === 'review' ? 3 : 2}단계 ·{' '}
+          {step === 'raw' ? '검사 시작' : step === 'review' ? '상세 검토' : '검사 결과'}
         </p>
         <details className="optional-help">
           <summary>상세 작업 안내</summary>
-          <StepGuide
-            step={step}
-            open={guides[step]}
-            onToggle={() =>
-              setGuides((prev) => ({ ...prev, [step]: !prev[step] }))
-            }
-          />
+          <StepGuide step={step} open={guides[step]} onToggle={() => setGuides((prev) => ({ ...prev, [step]: !prev[step] }))} />
           <aside className="next-action" aria-label="다음 행동">
             <div>
               <strong>다음 할 일</strong>
@@ -586,32 +455,21 @@ export default function App() {
           </aside>
         </details>
         <div className="scope">
-          XLSX·DOCX만 지원합니다. 파일은 브라우저에서 처리하며 외부로 전송하지
-          않습니다. 자동 발견은 확인 후보이며, 최종 오류 판정은 사용자 승인과
-          적용 조건 확인 후에 이루어집니다.
+          XLSX·DOCX만 지원합니다. 파일은 브라우저에서 처리하며 외부로 전송하지 않습니다. 자동 발견은 확인 후보이며, 최종 오류 판정은 사용자
+          승인과 적용 조건 확인 후에 이루어집니다.
         </div>
-        <div className="workspace" hidden={step !== "raw"}>
+        <div className="workspace" hidden={step !== 'raw'}>
           <DocumentPanel
             compact
             extension="xlsx"
             title="Excel 재무표"
             parse={parseXlsx}
             summary={(data) => (
-              <DocumentSummary
-                data={data}
-                items={review.items.filter(
-                  (c) => c.source === "XLSX" && c.method !== "직접 입력",
-                )}
-              />
+              <DocumentSummary data={data} items={review.items.filter((c) => c.source === 'XLSX' && c.method !== '직접 입력')} />
             )}
             onData={(data, fingerprint) => {
               setRegistered((prev) => ({ ...prev, XLSX: !!data }));
-              replaceSource(
-                "XLSX",
-                data ? extractWorkbook(data) : [],
-                data ? workbookReferences(data) : [],
-                fingerprint,
-              );
+              replaceSource('XLSX', data ? extractWorkbook(data) : [], data ? workbookReferences(data) : [], fingerprint);
             }}
           >
             {(data) => <WorkbookView data={data} showSource={false} />}
@@ -622,44 +480,27 @@ export default function App() {
             title="Word 보고서"
             parse={parseDocx}
             summary={(data) => (
-              <DocumentSummary
-                data={data}
-                items={review.items.filter(
-                  (c) => c.source === "DOCX" && c.method !== "직접 입력",
-                )}
-              />
+              <DocumentSummary data={data} items={review.items.filter((c) => c.source === 'DOCX' && c.method !== '직접 입력')} />
             )}
             onData={(data, fingerprint) => {
               setRegistered((prev) => ({ ...prev, DOCX: !!data }));
-              replaceSource(
-                "DOCX",
-                data ? extractWord(data) : [],
-                data ? wordReferences(data) : [],
-                fingerprint,
-              );
+              replaceSource('DOCX', data ? extractWord(data) : [], data ? wordReferences(data) : [], fingerprint);
             }}
           >
             {(data) => <WordView data={data} showSource={false} />}
           </DocumentPanel>
         </div>
-        {step === "raw" && (
+        {step === 'raw' && (
           <div className="inspection-start">
             <div>
-              <strong>
-                {registered.XLSX && registered.DOCX
-                  ? "두 문서가 준비됐습니다"
-                  : "Excel과 Word 파일을 각각 등록하세요"}
-              </strong>
-              <p>
-                계산·문서 간 수치·자금 배정·계획 후보를 자동 분석합니다. 규칙을
-                먼저 설정할 필요가 없습니다.
-              </p>
+              <strong>{registered.XLSX && registered.DOCX ? '두 문서가 준비됐습니다' : 'Excel과 Word 파일을 각각 등록하세요'}</strong>
+              <p>계산·문서 간 수치·자금 배정·계획 후보를 자동 분석합니다. 규칙을 먼저 설정할 필요가 없습니다.</p>
             </div>
             <Button
               disabled={!registered.XLSX || !registered.DOCX}
               onClick={() => {
                 setInspectionStarted(true);
-                setStep("results");
+                setStep('results');
                 setAdvancedOpen(false);
               }}
             >
@@ -667,9 +508,9 @@ export default function App() {
             </Button>
           </div>
         )}
-        {step === "review" && (
+        {step === 'review' && (
           <ReviewView
-            key={focusIds.join("|") || "review"}
+            key={focusIds.join('|') || 'review'}
             coreIds={coreIds}
             reasons={recommendations
               .filter((r) => r.primary)
@@ -688,7 +529,7 @@ export default function App() {
             onConfirm={confirm}
           />
         )}
-        {step === "results" && (
+        {step === 'results' && (
           <>
             <InspectionResults
               onInlineReview={inlineReview}
@@ -704,13 +545,9 @@ export default function App() {
               onApply={apply}
               onInspect={inspect}
               onPlan={openPlan}
-              onStart={() => setStep("raw")}
+              onStart={() => setStep('raw')}
             />
-            <details
-              className="advanced-workspace"
-              open={advancedOpen}
-              onToggle={(e) => setAdvancedOpen(e.currentTarget.open)}
-            >
+            <details className="advanced-workspace" open={advancedOpen} onToggle={(e) => setAdvancedOpen(e.currentTarget.open)}>
               <summary>고급 검사 설정·승인 결과</summary>
               <ResultsView
                 calculationFocus={calculationFocus}
@@ -718,7 +555,7 @@ export default function App() {
                 approvalVersion={approvalVersion}
                 recommendationPanel={
                   <RecommendationCenter
-                    key={recommendationFocus?.request ?? "recommendations"}
+                    key={recommendationFocus?.request ?? 'recommendations'}
                     focus={recommendationFocus}
                     recommendations={recommendations}
                     items={review.items}
@@ -740,9 +577,7 @@ export default function App() {
                       revision.current++;
                       setInlineDecisions({});
                       setReview(next);
-                      setCalculations((prev) =>
-                        prev.map((c) => ({ ...c, scopeConfirmed: false })),
-                      );
+                      setCalculations((prev) => prev.map((c) => ({ ...c, scopeConfirmed: false })));
                       setPlanning((prev) => ({
                         ...prev,
                         allocations: prev.allocations.map((r) => ({

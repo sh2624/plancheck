@@ -1,0 +1,13 @@
+node_modules/
+dist/
+dist-ssr/
+coverage/
+test-results/
+playwright-report/
+package-lock.json
+AGENTS.md
+.agents/
+.codex/
+.env*
+*.xlsx
+*.docx
