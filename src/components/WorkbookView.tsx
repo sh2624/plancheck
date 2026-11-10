@@ -1,5 +1,10 @@
 ﻿import { useMemo, useState } from "react";
-import { flexRender, getCoreRowModel, getPaginationRowModel, useReactTable } from "@tanstack/react-table";
+import {
+  flexRender,
+  getCoreRowModel,
+  getPaginationRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { Cell, Workbook } from "../parsers/types";
 import { Button } from "./ui/button";
@@ -29,7 +34,11 @@ function CellTable({ cells }: { cells: Cell[] }) {
         header: "추출 상태",
         cell: ({ row }) => (
           <span className={row.original.review ? "warning" : "muted"}>
-            {row.original.review ? "확인 필요" : row.original.formula ? "캐시 있음 · 미검증" : "추출됨"}
+            {row.original.review
+              ? "확인 필요"
+              : row.original.formula
+                ? "캐시 있음 · 미검증"
+                : "추출됨"}
           </span>
         ),
       },
@@ -51,7 +60,9 @@ function CellTable({ cells }: { cells: Cell[] }) {
             {table.getHeaderGroups().map((g) => (
               <tr key={g.id}>
                 {g.headers.map((h) => (
-                  <th key={h.id}>{flexRender(h.column.columnDef.header, h.getContext())}</th>
+                  <th key={h.id}>
+                    {flexRender(h.column.columnDef.header, h.getContext())}
+                  </th>
                 ))}
               </tr>
             ))}
@@ -60,7 +71,9 @@ function CellTable({ cells }: { cells: Cell[] }) {
             {table.getRowModel().rows.map((r) => (
               <tr key={r.id}>
                 {r.getVisibleCells().map((c) => (
-                  <td key={c.id}>{flexRender(c.column.columnDef.cell, c.getContext())}</td>
+                  <td key={c.id}>
+                    {flexRender(c.column.columnDef.cell, c.getContext())}
+                  </td>
                 ))}
               </tr>
             ))}
@@ -68,14 +81,23 @@ function CellTable({ cells }: { cells: Cell[] }) {
         </table>
       </div>
       <div className="pagination">
-        <Button variant="outline" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
+        <Button
+          variant="outline"
+          onClick={() => table.previousPage()}
+          disabled={!table.getCanPreviousPage()}
+        >
           이전
         </Button>
         <span>
-          {table.getState().pagination.pageIndex + 1} / {Math.max(1, table.getPageCount())} 페이지 ·{" "}
+          {table.getState().pagination.pageIndex + 1} /{" "}
+          {Math.max(1, table.getPageCount())} 페이지 ·{" "}
           {cells.length.toLocaleString()}개 셀
         </span>
-        <Button variant="outline" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
+        <Button
+          variant="outline"
+          onClick={() => table.nextPage()}
+          disabled={!table.getCanNextPage()}
+        >
           다음
         </Button>
       </div>
@@ -83,15 +105,24 @@ function CellTable({ cells }: { cells: Cell[] }) {
   );
 }
 /** 선택한 시트의 원본 위치와 병합 영역을 표시한다. */
-export function WorkbookView({ data }: { data: Workbook }) {
+export function WorkbookView({
+  data,
+  showSource = true,
+}: {
+  data: Workbook;
+  showSource?: boolean;
+}) {
   const [selected, setSelected] = useState(0);
   const sheet = data.sheets[selected] ?? data.sheets[0];
   return (
     <div>
-      <p className="source">원본: {data.fileName}</p>
+      {showSource && <p className="source">원본: {data.fileName}</p>}
       <label className="sheet-label">
         시트{" "}
-        <select value={selected} onChange={(e) => setSelected(Number(e.target.value))}>
+        <select
+          value={selected}
+          onChange={(e) => setSelected(Number(e.target.value))}
+        >
           {data.sheets.map((s, i) => (
             <option key={i} value={i}>
               {s.name}
@@ -100,7 +131,8 @@ export function WorkbookView({ data }: { data: Workbook }) {
         </select>
       </label>
       <p className="notice">
-        수식은 재계산하지 않습니다. 저장된 결과도 최신 여부를 확인해야 합니다. 날짜·백분율은 XML 저장값으로 표시됩니다.
+        수식은 재계산하지 않습니다. 저장된 결과도 최신 여부를 확인해야 합니다.
+        날짜·백분율은 XML 저장값으로 표시됩니다.
       </p>
       {sheet.merges.length > 0 && (
         <details>

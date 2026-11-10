@@ -1,4 +1,10 @@
-﻿import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { afterEach, expect, it } from "vitest";
 import App from "../src/App";
@@ -26,8 +32,17 @@ it.skipIf(!process.env.PLANCHECK_XLSX || !process.env.PLANCHECK_DOCX)(
     // 실제 ZIP/XML 처리 시간은 병렬 테스트의 CPU 부하에 따라 달라진다.
     await screen.findByText("원본: sample.xlsx", {}, { timeout: 5000 });
     await screen.findByText(/원본: sample.docx/, {}, { timeout: 5000 });
+    fireEvent.click(screen.getByText("원본 상세 보기 · Excel 재무표"));
+    fireEvent.click(screen.getByText("원본 상세 보기 · Word 보고서"));
     expect(screen.getAllByRole("option")).toHaveLength(5);
-    expect(screen.getAllByRole("heading", { level: 3 })).toHaveLength(10);
+    const original = screen
+      .getByRole("region", { name: "Word 보고서" })
+      .querySelector(".original-details")! as HTMLElement;
+    expect(within(original).getAllByRole("heading", { level: 3 })).toHaveLength(
+      10,
+    );
     expect(screen.queryByRole("alert")).toBeNull();
   },
+  // 실제 두 문서의 전체 원본 테이블을 펼치는 DOM 검사는 병렬 실행 부하를 고려한다.
+  15000,
 );

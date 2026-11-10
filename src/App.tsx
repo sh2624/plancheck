@@ -1,4 +1,4 @@
-﻿import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef } from "react";
 import { FileCheck2, LockKeyhole } from "lucide-react";
 import { DocumentPanel } from "./components/DocumentPanel";
 import { WorkbookView } from "./components/WorkbookView";
@@ -28,10 +28,22 @@ import type { Recommendation } from "./recommendations/types";
 import { RecommendationCenter } from "./components/RecommendationCenter";
 import { SessionReview } from "./components/SessionReview";
 import type { Documents } from "./session/checkpoint";
+import { StepGuide } from "./components/StepGuide";
+import { DocumentSummary } from "./components/DocumentSummary";
+import { coreCandidates, reviewProgress } from "./presentation/workflow";
+import { validateAll } from "./validation/engine";
+import { validatePlanning } from "./planning/engine";
+import { presentResult } from "./presentation/results";
 /** 원본 추출과 사용자 확인 상태를 관리하며 파일 교체 시 관련 연결을 해제한다. */
 export default function App() {
   const revision = useRef(0);
   const [step, setStep] = useState<"raw" | "review" | "results">("raw");
+  const [guides, setGuides] = useState({
+    raw: true,
+    review: true,
+    results: true,
+  });
+  const [registered, setRegistered] = useState({ XLSX: false, DOCX: false });
   const [focusIds, setFocusIds] = useState<string[]>([]);
   const [planning, setPlanning] = useState(emptyPlanning);
   const [sourceReferences, setSourceReferences] = useState<EvidenceRef[]>([]);
@@ -42,6 +54,10 @@ export default function App() {
     request: string;
   }>();
   const [approvalVersion, setApprovalVersion] = useState(0);
+  const [calculationFocus, setCalculationFocus] = useState<{
+    id: string;
+    request: string;
+  }>();
   const [planFocus, setPlanFocus] = useState<{
     kind: "allocations" | "funds" | "actions";
     id: string;
@@ -58,6 +74,112 @@ export default function App() {
     () => recommend(review.items, review.links, planning, sourceReferences),
     [review.items, review.links, planning, sourceReferences],
   );
+  const coreIds = coreCandidates(review.items, recommendations);
+  const progress = reviewProgress(review.items, coreIds);
+  const results = useMemo(
+    () => [
+      ...validateAll(review.items, review.links, calculations),
+      ...validatePlanning(review.items, planning),
+    ],
+    [review, calculations, planning],
+  );
+  const pendingResult =
+    results.find(
+      (r) =>
+        r.code === "CROSS_VALUE" &&
+        r.status !== "오류" &&
+        r.status !== "검증 통과",
+    ) ??
+    results.find((r) => r.status === "검증 불가" || r.status === "확인 필요");
+  const unapproved = recommendations.find(
+    (r) =>
+      r.primary &&
+      (r.link
+        ? !review.links.some(
+            (l) => l.xlsxId === r.link!.xlsxId && l.docxId === r.link!.docxId,
+          )
+        : r.calculation
+          ? !calculations.some(
+              (c) => c.id === r.calculation!.id && c.scopeConfirmed,
+            )
+          : !r.reviewed),
+  );
+  /** 누락된 파일의 등록 위치로 이동하고 키보드 초점을 맞춘다. */
+  function register(source: "XLSX" | "DOCX") {
+    setStep("raw");
+    requestAnimationFrame(() => {
+      const input = document.getElementById(
+        source === "XLSX" ? "xlsx" : "docx",
+      );
+      input?.scrollIntoView?.({ block: "center" });
+      input?.focus();
+    });
+  }
+  /** 등록·확인·승인·판정 상태에 맞춰 지금 수행할 한 가지 행동을 제시한다. */
+  function nextAction() {
+    if (!registered.XLSX)
+      return {
+        text: "Excel 재무표가 없습니다. 먼저 파일을 등록하세요.",
+        label: "Excel 등록",
+        run: () => register("XLSX"),
+      };
+    if (!registered.DOCX)
+      return {
+        text: "Word 보고서를 등록하면 두 문서의 값을 비교할 수 있습니다.",
+        label: "Word 등록",
+        run: () => register("DOCX"),
+      };
+    if (step === "raw")
+      return {
+        text: "두 문서가 등록됐습니다. 핵심 항목의 값과 원본부터 확인하세요.",
+        label: "데이터 확인으로 이동",
+        run: () => {
+          setFocusIds([]);
+          setStep("review");
+        },
+      };
+    if (step === "review" && progress.pending.length)
+      return {
+        text: `핵심 확인 대상 ${progress.total}개 중 ${progress.confirmed}개를 확인했습니다. 원문과 단위·기준을 검토해야 오류를 확정할 수 있습니다.`,
+        label: "핵심 확인 항목으로 이동",
+        run: () => inspect(progress.pending),
+      };
+    if (pendingResult?.status === "확인 필요")
+      return {
+        text: `${presentResult(pendingResult).headline}: ${presentResult(pendingResult).nextAction}`,
+        label: "동일 기준·조건 확인",
+        run: () => prepare(pendingResult),
+      };
+    if (unapproved)
+      return {
+        text: `${unapproved.title} — 추천 관계와 적용 기준을 검토한 뒤 승인하세요.`,
+        label: unapproved.calculation
+          ? "계산 구성 항목 확인"
+          : "동일 항목 연결 확인",
+        run: () => {
+          setStep("results");
+          setRecommendationFocus({
+            id: unapproved.id,
+            kind: unapproved.kind,
+            request: crypto.randomUUID(),
+          });
+        },
+      };
+    if (pendingResult)
+      return {
+        text: `${presentResult(pendingResult).headline}: ${presentResult(pendingResult).nextAction}`,
+        label: "필요한 조건 확인",
+        run: () => prepare(pendingResult),
+      };
+    return {
+      text: results.length
+        ? "현재 구성한 검증의 판정 결과를 확인하세요. 추가 항목의 정상 여부를 뜻하지 않습니다."
+        : "검증 후보를 자동으로 찾지 못했습니다. 원본을 검토하고 항목과 검증 구성을 추가하세요.",
+      label: results.length ? "결과 확인" : "항목 확인·추가",
+      run: () => (results.length ? setStep("results") : inspect([])),
+    };
+  }
+  const next = nextAction();
   function inspect(ids: string[]) {
     setFocusIds(ids);
     setStep("review");
@@ -71,6 +193,7 @@ export default function App() {
   }
   /** 판정에 사용한 항목과 일치하는 추천 또는 구조화 확인 화면으로 안내한다. */
   function prepare(result: Result) {
+    setStep("results");
     const exact = recommendations.find(
       (r) =>
         (r.calculation && `calc:${r.calculation.id}` === result.id) ||
@@ -104,6 +227,13 @@ export default function App() {
       recommendations.find((r) => r.kind === kind);
     if (candidate?.planFocus) {
       openPlan(candidate);
+      return;
+    }
+    if (!candidate && kind === "CALC") {
+      setCalculationFocus({
+        id: result.id.replace(/^calc:/, ""),
+        request: crypto.randomUUID(),
+      });
       return;
     }
     setRecommendationFocus({
@@ -278,7 +408,7 @@ export default function App() {
         <div className="intro">
           <h1>
             {step === "raw"
-              ? "문서 추출"
+              ? "문서 등록"
               : step === "review"
                 ? "데이터 확인"
                 : "검수 결과"}
@@ -289,13 +419,15 @@ export default function App() {
           <Button
             variant={step === "raw" ? "default" : "outline"}
             aria-pressed={step === "raw"}
+            aria-current={step === "raw" ? "step" : undefined}
             onClick={() => setStep("raw")}
           >
-            1. 원본 추출
+            1. 문서 등록
           </Button>
           <Button
             variant={step === "review" ? "default" : "outline"}
             aria-pressed={step === "review"}
+            aria-current={step === "review" ? "step" : undefined}
             onClick={() => {
               setFocusIds([]);
               setStep("review");
@@ -306,60 +438,114 @@ export default function App() {
           <Button
             variant={step === "results" ? "default" : "outline"}
             aria-pressed={step === "results"}
+            aria-current={step === "results" ? "step" : undefined}
             onClick={() => setStep("results")}
           >
             3. 검수 결과
           </Button>
         </nav>
+        <p className="muted">
+          3단계 중 {step === "raw" ? 1 : step === "review" ? 2 : 3}단계 ·{" "}
+          {step === "raw"
+            ? "문서 등록"
+            : step === "review"
+              ? "데이터 확인"
+              : "검수 결과"}
+        </p>
+        <StepGuide
+          step={step}
+          open={guides[step]}
+          onToggle={() =>
+            setGuides((prev) => ({ ...prev, [step]: !prev[step] }))
+          }
+        />
+        <aside className="next-action" aria-label="다음 행동">
+          <div>
+            <strong>다음 할 일</strong>
+            <p>{next.text}</p>
+          </div>
+          <Button onClick={next.run}>{next.label}</Button>
+        </aside>
         <div className="scope">
           파일은 외부 서버로 전송하지 않습니다. 추출 후보와 문서 간 연결은
           사용자 확인 대상입니다. 확인된 값과 선택한 계산 범위·승인 연결에
           한정해 검증합니다.
         </div>
-        {step === "raw" && review.items.length > 0 && (
-          <aside className="upload-next">
-            <span>
-              전체 항목을 확인할 필요 없이 핵심 추천부터 검토할 수 있습니다.
-            </span>
-            <Button onClick={() => setStep("results")}>
-              핵심 추천 {recommendations.filter((r) => r.primary).length}건 검토
-            </Button>
-          </aside>
-        )}
+        {step === "raw" &&
+          registered.XLSX &&
+          registered.DOCX &&
+          review.items.length > 0 && (
+            <aside className="upload-next">
+              <span>
+                전체 항목을 확인할 필요 없이 핵심 추천부터 검토할 수 있습니다.
+              </span>
+              <Button variant="outline" onClick={() => setStep("results")}>
+                핵심 추천 {recommendations.filter((r) => r.primary).length}건
+                검토
+              </Button>
+            </aside>
+          )}
         <div className="workspace" hidden={step !== "raw"}>
           <DocumentPanel
             extension="xlsx"
             title="Excel 재무표"
             parse={parseXlsx}
-            onData={(data, fingerprint) =>
+            summary={(data) => (
+              <DocumentSummary
+                data={data}
+                items={review.items.filter(
+                  (c) => c.source === "XLSX" && c.method !== "직접 입력",
+                )}
+              />
+            )}
+            onData={(data, fingerprint) => {
+              setRegistered((prev) => ({ ...prev, XLSX: !!data }));
               replaceSource(
                 "XLSX",
                 data ? extractWorkbook(data) : [],
                 data ? workbookReferences(data) : [],
                 fingerprint,
-              )
-            }
+              );
+            }}
           >
-            {(data) => <WorkbookView data={data} />}
+            {(data) => <WorkbookView data={data} showSource={false} />}
           </DocumentPanel>
           <DocumentPanel
             extension="docx"
             title="Word 보고서"
             parse={parseDocx}
-            onData={(data, fingerprint) =>
+            summary={(data) => (
+              <DocumentSummary
+                data={data}
+                items={review.items.filter(
+                  (c) => c.source === "DOCX" && c.method !== "직접 입력",
+                )}
+              />
+            )}
+            onData={(data, fingerprint) => {
+              setRegistered((prev) => ({ ...prev, DOCX: !!data }));
               replaceSource(
                 "DOCX",
                 data ? extractWord(data) : [],
                 data ? wordReferences(data) : [],
                 fingerprint,
-              )
-            }
+              );
+            }}
           >
-            {(data) => <WordView data={data} />}
+            {(data) => <WordView data={data} showSource={false} />}
           </DocumentPanel>
         </div>
         {step === "review" && (
           <ReviewView
+            key={focusIds.join("|") || "review"}
+            coreIds={coreIds}
+            reasons={recommendations
+              .filter((r) => r.primary)
+              .map((r) => ({
+                ids: r.candidateIds,
+                reason: r.reason,
+                title: r.title,
+              }))}
             focusIds={focusIds}
             items={review.items}
             links={review.links}
@@ -372,6 +558,7 @@ export default function App() {
         )}
         {step === "results" && (
           <ResultsView
+            calculationFocus={calculationFocus}
             onPrepare={prepare}
             approvalVersion={approvalVersion}
             recommendationPanel={

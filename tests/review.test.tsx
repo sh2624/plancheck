@@ -1,4 +1,4 @@
-﻿import { afterEach, it, expect, vi } from "vitest";
+import { afterEach, it, expect, vi } from "vitest";
 import {
   cleanup,
   fireEvent,
@@ -133,7 +133,7 @@ it("제외·복원·직접 추가를 지원하고 파일 초기화 시 관련 �
   });
   expect(within(region).getAllByLabelText("숫자")).toHaveLength(2);
   approve(region);
-  fireEvent.click(screen.getByRole("button", { name: "1. 원본 추출" }));
+  fireEvent.click(screen.getByRole("button", { name: "1. 문서 등록" }));
   fireEvent.click(screen.getByRole("button", { name: "Excel 재무표 초기화" }));
   fireEvent.click(screen.getByRole("button", { name: /2. 데이터 확인/ }));
   expect(screen.getByRole("heading", { name: "승인한 연결 0개" })).toBeTruthy();

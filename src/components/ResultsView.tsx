@@ -12,6 +12,7 @@ import type { Planning } from "../planning/types";
 import type { EvidenceRef } from "../validation/types";
 import { PlanningEditor } from "./PlanningEditor";
 type Props = {
+  calculationFocus?: { id: string; request: string };
   onPrepare?: (result: Result) => void;
   approvalVersion?: number;
   recommendationPanel?: ReactNode;
@@ -38,6 +39,7 @@ const statusClass: Record<Status, string> = {
 };
 /** 선택 범위 설정과 현재 데이터로 계산한 결과를 표시하며 모든 판정의 원본 근거를 연다. */
 export function ResultsView({
+  calculationFocus,
   onPrepare,
   approvalVersion = 0,
   recommendationPanel,
@@ -52,14 +54,28 @@ export function ResultsView({
   onChange,
   onInspect,
 }: Props) {
+  const settingsRef = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    if (!calculationFocus || !settingsRef.current) return;
+    settingsRef.current.open = true;
+    const fieldset = Array.from(
+      settingsRef.current.querySelectorAll("fieldset"),
+    ).find((el) => el.dataset.calculation === calculationFocus.id);
+    (fieldset ?? settingsRef.current).scrollIntoView?.({ block: "start" });
+    fieldset?.focus();
+  }, [calculationFocus]);
   const [selected, setSelected] = useState(""),
     [filterState, setFilterState] = useState({
-      value: "전체",
+      value: recommendationPanel ? "판정 결과" : "전체",
       version: approvalVersion,
     }),
     [addRule, setAddRule] = useState<Rule>("assets");
   const filter =
-    filterState.version === approvalVersion ? filterState.value : "전체";
+    filterState.version === approvalVersion
+      ? filterState.value
+      : recommendationPanel
+        ? "판정 결과"
+        : "전체";
   const setFilter = (value: string) =>
     setFilterState({ value, version: approvalVersion });
   const results = useMemo(
@@ -76,7 +92,12 @@ export function ResultsView({
     "검증 불가": 3,
   };
   const visible = results
-    .filter((r) => filter === "전체" || r.status === filter)
+    .filter(
+      (r) =>
+        filter === "전체" ||
+        (filter === "판정 결과" && r.status !== "검증 불가") ||
+        r.status === filter,
+    )
     .sort((a, b) => priority[a.status] - priority[b.status]);
   const detail = results.find((r) => r.id === selected);
   const detailPresentation = detail ? presentResult(detail) : undefined;
@@ -169,7 +190,14 @@ export function ResultsView({
       <label className="review-filter">
         결과 필터
         <select value={filter} onChange={(e) => setFilter(e.target.value)}>
-          {["전체", "오류", "확인 필요", "검증 통과", "검증 불가"].map((s) => (
+          {[
+            "판정 결과",
+            "전체",
+            "오류",
+            "확인 필요",
+            "검증 통과",
+            "검증 불가",
+          ].map((s) => (
             <option key={s}>{s}</option>
           ))}
         </select>
@@ -286,9 +314,39 @@ export function ResultsView({
       {!visible.length && (
         <p className="empty">
           {results.length
-            ? "선택한 상태의 결과가 없습니다. 다른 상태나 전체 결과를 확인하세요."
+            ? filter === "판정 결과"
+              ? "아직 판정할 결과가 없습니다. 아래 준비 중 항목에서 필요한 값·범위를 확인하세요."
+              : "선택한 상태의 결과가 없습니다. 다른 상태나 전체 결과를 확인하세요."
             : "표시할 검증 결과가 없습니다. 계산을 설정하거나 문서 간 연결을 승인하세요."}
         </p>
+      )}
+      {recommendationPanel && (
+        <details className="preparation-list">
+          <summary>
+            검증 준비 중{" "}
+            {results.filter((r) => r.status === "검증 불가").length}건 · 필요한
+            확인 보기
+          </summary>
+          <p className="muted">
+            필수 값이나 사용자 확인이 부족한 항목입니다. 실패 또는 정상으로
+            판정한 결과가 아닙니다.
+          </p>
+          <ul>
+            {results
+              .filter((r) => r.status === "검증 불가")
+              .map((r) => (
+                <li key={r.id}>
+                  <div>
+                    <strong>{r.title}</strong>
+                    <p>{r.needs[0] ?? "원본의 값과 적용 조건을 확인하세요."}</p>
+                  </div>
+                  <Button variant="outline" onClick={() => onPrepare?.(r)}>
+                    필요한 항목 확인
+                  </Button>
+                </li>
+              ))}
+          </ul>
+        </details>
       )}
       {detail && (
         <section
@@ -355,7 +413,11 @@ export function ResultsView({
         <div className="recommendation-panel">{recommendationPanel}</div>
       )}
       {sessionPanel && <div className="session-panel">{sessionPanel}</div>}
-      <details className="calculation-settings" open={!recommendationPanel}>
+      <details
+        ref={settingsRef}
+        className="calculation-settings"
+        open={!recommendationPanel}
+      >
         <summary>계산 범위 및 대출 조건</summary>
         <p className="muted">
           복수 선택은 Ctrl 또는 Shift와 함께 선택합니다. 합계 검증은 선택한
@@ -363,7 +425,7 @@ export function ResultsView({
           0원 항목을 직접 추가하세요.
         </p>
         {calculations.map((s, index) => (
-          <fieldset key={s.id}>
+          <fieldset key={s.id} data-calculation={s.id} tabIndex={-1}>
             <legend>
               {index + 1}. {ruleTitles[s.rule]}
             </legend>

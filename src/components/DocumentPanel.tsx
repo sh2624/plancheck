@@ -8,6 +8,7 @@ type Props<T> = {
   title: string;
   parse: (data: ArrayBuffer, name: string) => Promise<T>;
   children: (data: T) => React.ReactNode;
+  summary?: (data: T) => React.ReactNode;
   onData?: (data: T | undefined, fingerprint?: string) => void;
 };
 /** 파일 변경 시 결과를 비우고 원본 지문과 최신 파싱 응답만 전달한다. */
@@ -17,6 +18,7 @@ export function DocumentPanel<T>({
   parse,
   children,
   onData,
+  summary,
 }: Props<T>) {
   const [data, setData] = useState<T>(),
     [error, setError] = useState(""),
@@ -31,6 +33,7 @@ export function DocumentPanel<T>({
     setError("");
     setName("");
     setBusy(false);
+    /** 같은 파일을 다시 등록해도 변경 이벤트가 발생하도록 입력을 비운다. */
     if (input.current) input.current.value = "";
   }
   async function upload(file?: File) {
@@ -79,6 +82,7 @@ export function DocumentPanel<T>({
         <input
           ref={input}
           id={extension}
+          aria-describedby={`${extension}-status`}
           type="file"
           accept={`.${extension}`}
           onChange={(e) => void upload(e.target.files?.[0])}
@@ -98,6 +102,15 @@ export function DocumentPanel<T>({
         )}
       </div>
       <div aria-live="polite">
+        <p id={`${extension}-status`} className="registration-status">
+          {busy
+            ? "등록 중"
+            : error
+              ? "등록 실패"
+              : data
+                ? "등록 완료 · 추출됨"
+                : "미등록"}
+        </p>
         {busy && <p role="status">파일을 추출하고 있습니다…</p>}
         {error && (
           <p role="alert" className="error">
@@ -105,17 +118,29 @@ export function DocumentPanel<T>({
           </p>
         )}
       </div>
-      {data
-        ? children(data)
-        : !busy &&
-          !error && (
-            <div className="empty">
-              <p>선택한 문서가 없습니다.</p>
-              <p className="muted">
-                파일을 선택하면 원본 내용과 위치를 표시합니다.
-              </p>
-            </div>
-          )}
+      {data ? (
+        summary ? (
+          <>
+            {summary(data)}
+            <details className="original-details" key={name}>
+              <summary>원본 상세 보기 · {title}</summary>
+              {children(data)}
+            </details>
+          </>
+        ) : (
+          children(data)
+        )
+      ) : (
+        !busy &&
+        !error && (
+          <div className="empty">
+            <p>선택한 문서가 없습니다.</p>
+            <p className="muted">
+              파일을 선택하면 원본 내용과 위치를 표시합니다.
+            </p>
+          </div>
+        )
+      )}
     </section>
   );
 }

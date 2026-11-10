@@ -4,7 +4,10 @@ import { fieldLabels, units } from "../normalization/types";
 import type { Candidate, Link, Field, Unit } from "../normalization/types";
 import { canConfirm } from "../normalization/values";
 import { suggestLinks } from "../normalization/links";
+import { candidateValue } from "../presentation/workflow";
 type Props = {
+  coreIds?: string[];
+  reasons?: { ids: string[]; reason: string; title: string }[];
   focusIds?: string[];
   items: Candidate[];
   links: Link[];
@@ -17,6 +20,8 @@ type Props = {
 
 /** 목록은 항목·값·원본·확인 상태만 보여주고 모든 수정 기능은 행의 상세 편집에서 유지한다. */
 export function ReviewView({
+  coreIds,
+  reasons = [],
   items,
   links,
   onEdit,
@@ -33,7 +38,9 @@ export function ReviewView({
       root.current?.focus({ preventScroll: true });
     }
   }, [focusIds]);
-  const [filter, setFilter] = useState(focusIds.length ? "관련 항목" : "전체"),
+  const [filter, setFilter] = useState(
+      focusIds.length ? "관련 항목" : coreIds ? "핵심 확인" : "전체",
+    ),
     [search, setSearch] = useState(""),
     [page, setPage] = useState(0),
     [a, setA] = useState(""),
@@ -47,6 +54,7 @@ export function ReviewView({
         ? c.excluded
         : !c.excluded &&
           (filter === "전체" ||
+            (filter === "핵심 확인" && !!coreIds?.includes(c.id)) ||
             (filter === "미확인" && !c.confirmed) ||
             (filter === "관련 항목" && focusIds.includes(c.id)) ||
             c.source === filter)) &&
@@ -100,6 +108,19 @@ export function ReviewView({
         모든 수정 기능은 ‘상세 편집’에 있습니다. 확인되지 않은 값은 확정 오류로
         판정하지 않습니다.
       </p>
+      {coreIds && (
+        <p className="review-progress" role="status">
+          핵심 확인 진행:{" "}
+          {
+            items.filter(
+              (c) => coreIds.includes(c.id) && !c.excluded && c.confirmed,
+            ).length
+          }{" "}
+          / {items.filter((c) => coreIds.includes(c.id) && !c.excluded).length}
+          개 · 값 확인과 검증 승인은 별개입니다. 전체 후보는 목록 필터의
+          ‘전체’에서 볼 수 있습니다.
+        </p>
+      )}
       <div className="review-filters">
         <label>
           목록 필터
@@ -111,6 +132,7 @@ export function ReviewView({
             }}
           >
             {[
+              ...(coreIds ? ["핵심 확인"] : []),
               "전체",
               "미확인",
               "XLSX",
@@ -150,6 +172,15 @@ export function ReviewView({
               <tr key={c.id} className={c.excluded ? "excluded" : ""}>
                 <td>
                   <strong>{c.label}</strong>
+                  {coreIds?.includes(c.id) && (
+                    <small className="review-reason">
+                      {reasons.find((r) => r.ids.includes(c.id))?.title ??
+                        "주요 재무 항목"}
+                      에 사용됩니다.{" "}
+                      {reasons.find((r) => r.ids.includes(c.id))?.reason ??
+                        "원본과 값·단위·기준을 확인해야 검증에 사용할 수 있습니다."}
+                    </small>
+                  )}
                   <details
                     className="candidate-editor"
                     name="candidate-editor"
@@ -280,8 +311,11 @@ export function ReviewView({
                   </details>
                 </td>
                 <td>
-                  <p className="candidate-value">
-                    {c.number || "값 없음"} {c.unit}
+                  <p
+                    className="candidate-value"
+                    title={`추출 숫자: ${c.number || "없음"} ${c.unit}`}
+                  >
+                    {candidateValue(c)}
                   </p>
                 </td>
                 <td>

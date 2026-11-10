@@ -10,9 +10,7 @@ async function upload(page: Page) {
   await expect(
     page.getByText(`원본: ${basename(xlsx!)}`, { exact: true }),
   ).toBeVisible();
-  await expect(
-    page.getByText(`원본: ${basename(docx!)}`),
-  ).toBeVisible();
+  await expect(page.getByText(`원본: ${basename(docx!)}`)).toBeVisible();
 }
 async function recommend(page: Page, pattern: RegExp) {
   const root = page.locator("details.recommendation-center");
@@ -62,10 +60,14 @@ test("자료 없는 화면은 오류가 아니라 검증 준비 중으로 안내
     page.getByRole("button", { name: "오류 0", exact: true }),
   ).toBeVisible();
   await expect(
-    table(page).getByText("검증 준비 중", { exact: true }).first(),
+    page.getByText("아직 판정할 결과가 없습니다.", { exact: false }),
   ).toBeVisible();
+  await page.locator(".preparation-list > summary").click();
   await expect(
-    table(page).getByRole("button", { name: "추천 검토·승인" }).first(),
+    page
+      .locator(".preparation-list")
+      .getByRole("button", { name: "필요한 항목 확인" })
+      .first(),
   ).toBeVisible();
   check();
 });
@@ -122,7 +124,7 @@ test.describe("제공된 실제 문서 시연", () => {
     await expect(detail).toContainText("!");
     await expect(detail).toContainText(/본문 (문단|표)/);
     await detail.screenshot({ path: info.outputPath("credit-proof.png") });
-    // 준비 중 결과 필터를 선택한 상태에서도 새 승인은 결과 전체로 복귀해야 한다.
+    // 준비 중 필터에서 승인해도 새 오류가 보이는 판정 결과로 복귀해야 한다.
     await page.getByRole("button", { name: /^검증 불가 \d+$/ }).click();
     const student = await recommend(page, /^CROSS ·.*학자금대출.*잔액/);
     await expect(student.getByLabel("추천 숫자").nth(0)).toHaveValue("700");
@@ -134,7 +136,7 @@ test.describe("제공된 실제 문서 시연", () => {
       name: /학자금대출 잔액이 두 문서에서 다릅니다/,
     });
     await expect(studentError).toBeVisible();
-    await expect(page.getByLabel("결과 필터")).toHaveValue("전체");
+    await expect(page.getByLabel("결과 필터")).toHaveValue("판정 결과");
     await studentError.click();
     detail = page.getByRole("region", { name: "검증 근거 상세" });
     await expect(detail).toContainText("15,000 원");
@@ -145,7 +147,7 @@ test.describe("제공된 실제 문서 시연", () => {
       path: info.outputPath("results-desktop.png"),
       fullPage: true,
     });
-    await page.getByRole("button", { name: "1. 원본 추출" }).click();
+    await page.getByRole("button", { name: "1. 문서 등록" }).click();
     await page.getByLabel(/검토할 Excel/).setInputFiles(xlsx!);
     await expect(
       page.getByText(`원본: ${basename(xlsx!)}`, { exact: true }),

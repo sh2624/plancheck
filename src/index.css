@@ -112,9 +112,10 @@ h3 {
 input[type="file"] {
   display: block;
   max-width: 100%;
-  font-size: 13px;
+  font-size: 0;
 }
 input::file-selector-button {
+  font-size: 13px;
   background: #183553;
   color: white;
   padding: 8px 12px;
@@ -741,5 +742,124 @@ footer {
   .compact-review td:has(.candidate-editor[open]) {
     min-width: 400px;
     max-width: 420px;
+  }
+}
+
+.step-guide,
+.next-action {
+  border: 1px solid #dce1e7;
+  background: #fff;
+  padding: 16px 20px;
+  margin: 16px 0;
+  font-size: 13px;
+}
+.guide-heading,
+.next-action {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.step-guide p {
+  margin-top: 8px;
+  max-width: 1050px;
+}
+.step-guide p > strong {
+  margin-right: 8px;
+}
+.next-action {
+  border-left: 3px solid #183553;
+}
+.next-action p {
+  margin-top: 4px;
+  color: #526174;
+}
+.next-action button {
+  flex-shrink: 0;
+}
+.registration-status {
+  padding: 12px 20px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #334f70;
+}
+.document-summary {
+  padding: 0 20px 16px;
+  font-size: 13px;
+}
+.document-summary .source {
+  padding: 12px 0 8px;
+}
+.document-summary h3 {
+  margin-top: 18px;
+  font-size: 13px;
+}
+.document-summary li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  padding: 8px 0;
+  border-top: 1px solid #edf0f4;
+}
+.document-summary li small {
+  grid-column: 1 / -1;
+}
+.original-details {
+  border-top: 1px solid #dce1e7;
+}
+.original-details > summary {
+  padding: 14px 20px;
+  font-size: 13px;
+  color: #334f70;
+}
+.review-progress {
+  padding: 12px 20px;
+  border-bottom: 1px solid #e1e6ed;
+  font-size: 12px;
+  color: #526174;
+}
+.review-reason {
+  display: block;
+  margin-top: 6px;
+  max-width: 360px;
+  font-weight: 400;
+}
+.preparation-list {
+  padding: 16px 20px;
+  border-block: 1px solid #dce1e7;
+  font-size: 13px;
+}
+.preparation-list > summary {
+  font-weight: 600;
+  color: #526174;
+}
+.preparation-list > p {
+  margin-top: 10px;
+}
+.preparation-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 0;
+  border-top: 1px solid #e1e6ed;
+}
+.preparation-list li p {
+  margin-top: 4px;
+  color: #64748b;
+}
+.preparation-list li button {
+  flex-shrink: 0;
+}
+.steps [aria-current="step"] {
+  outline: 2px solid #183553;
+  outline-offset: 3px;
+}
+@media (max-width: 700px) {
+  .next-action,
+  .guide-heading,
+  .preparation-list li {
+    align-items: flex-start;
+    flex-wrap: wrap;
   }
 }
