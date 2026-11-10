@@ -1,4 +1,5 @@
-﻿import { readFileSync } from "node:fs";
+import { openAdvancedResults } from "./workflow-ui";
+import { readFileSync } from "node:fs";
 import { afterEach, it, expect } from "vitest";
 import {
   cleanup,
@@ -28,7 +29,7 @@ it.skipIf(!process.env.PLANCHECK_XLSX || !process.env.PLANCHECK_DOCX)(
     });
     await screen.findByText("원본: financial.xlsx", {}, { timeout: 5000 });
     await screen.findByText(/원본: report.docx/, {}, { timeout: 5000 });
-    fireEvent.click(screen.getByRole("button", { name: /핵심 추천.*검토/ }));
+    openAdvancedResults();
     expect(
       screen.queryByText("오류", { selector: "span", exact: true }),
     ).toBeNull();

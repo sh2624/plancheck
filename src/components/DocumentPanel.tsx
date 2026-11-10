@@ -4,6 +4,7 @@ import { Button } from "./ui/button";
 import { validateFile } from "../parsers/package";
 import { digest } from "../session/checkpoint";
 type Props<T> = {
+  compact?: boolean;
   extension: "xlsx" | "docx";
   title: string;
   parse: (data: ArrayBuffer, name: string) => Promise<T>;
@@ -19,6 +20,7 @@ export function DocumentPanel<T>({
   children,
   onData,
   summary,
+  compact = false,
 }: Props<T>) {
   const [data, setData] = useState<T>(),
     [error, setError] = useState(""),
@@ -118,7 +120,16 @@ export function DocumentPanel<T>({
           </p>
         )}
       </div>
-      {data ? (
+      {data && compact ? (
+        <details className="document-advanced">
+          <summary>추출 요약·원본 보기 · {title}</summary>
+          {summary?.(data)}
+          <details className="original-details">
+            <summary>원본 상세 보기 · {title}</summary>
+            {children(data)}
+          </details>
+        </details>
+      ) : data ? (
         summary ? (
           <>
             {summary(data)}

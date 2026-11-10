@@ -1,3 +1,4 @@
+import { openAdvanced, openSources } from "./workflow";
 import { test, expect, type Page, type Locator } from "@playwright/test";
 import { basename } from "node:path";
 const xlsx = process.env.PLANCHECK_XLSX,
@@ -7,6 +8,7 @@ async function upload(page: Page) {
   await page.goto("/");
   await page.getByLabel(/검토할 Excel/).setInputFiles(xlsx!);
   await page.getByLabel(/검토할 Word/).setInputFiles(docx!);
+  await openSources(page);
   await expect(
     page.getByText(`원본: ${basename(xlsx!)}`, { exact: true }),
   ).toBeVisible();
@@ -55,7 +57,7 @@ test("자료 없는 화면은 오류가 아니라 검증 준비 중으로 안내
 }) => {
   const check = audit(page);
   await page.goto("/");
-  await page.getByRole("button", { name: "3. 검수 결과" }).click();
+  await openAdvanced(page);
   await expect(
     page.getByRole("button", { name: "오류 0", exact: true }),
   ).toBeVisible();
@@ -82,7 +84,7 @@ test.describe("제공된 실제 문서 시연", () => {
   }, info) => {
     const check = audit(page);
     await upload(page);
-    await page.getByRole("button", { name: /핵심 추천 .*건 검토/ }).click();
+    await openAdvanced(page);
     await expect(
       page.getByRole("button", { name: "오류 0", exact: true }),
     ).toBeVisible();
@@ -111,7 +113,7 @@ test.describe("제공된 실제 문서 시연", () => {
       await metadata(row);
       await row.getByRole("button", { name: "확인 완료", exact: true }).click();
     }
-    await page.getByRole("button", { name: "3. 검수 결과" }).click();
+    await openAdvanced(page);
     await approve(await recommend(page, /^CROSS ·.*신용대출.*금리/));
     const creditError = table(page).getByRole("button", {
       name: /신용대출 금리가 1\.0%p 차이 납니다/,
@@ -147,12 +149,13 @@ test.describe("제공된 실제 문서 시연", () => {
       path: info.outputPath("results-desktop.png"),
       fullPage: true,
     });
-    await page.getByRole("button", { name: "1. 문서 등록" }).click();
+    await page.getByRole("button", { name: "1. 검사 시작" }).click();
     await page.getByLabel(/검토할 Excel/).setInputFiles(xlsx!);
+    await openSources(page);
     await expect(
       page.getByText(`원본: ${basename(xlsx!)}`, { exact: true }),
     ).toBeVisible();
-    await page.getByRole("button", { name: "3. 검수 결과" }).click();
+    await openAdvanced(page);
     await expect(
       table(page).getByRole("button", { name: /CROSS_VALUE/ }),
     ).toHaveCount(0);
@@ -167,7 +170,7 @@ test.describe("제공된 실제 문서 시연", () => {
   }, info) => {
     const check = audit(page);
     await upload(page);
-    await page.getByRole("button", { name: /2. 데이터 확인/ }).click();
+    await page.getByRole("button", { name: /3. 상세 검토/ }).click();
     await page.getByLabel("목록 필터").selectOption("DOCX");
     await page.getByLabel("항목 검색").fill("유동성 자산 · 예금·적금");
     let row = page.locator(".review-table tbody tr");
@@ -193,7 +196,7 @@ test.describe("제공된 실제 문서 시연", () => {
       await row.getByLabel("확정 여부").selectOption("확정");
       await row.getByRole("button", { name: "확인 완료", exact: true }).click();
     }
-    await page.getByRole("button", { name: "3. 검수 결과" }).click();
+    await openAdvanced(page);
     const recommendations = page.locator("details.recommendation-center");
     await page.getByLabel("추천 종류").selectOption("ALLOC");
     await recommendations

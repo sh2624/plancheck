@@ -1,12 +1,14 @@
+import { openAdvanced, openSources } from "./workflow";
 import { test, expect } from "@playwright/test";
 import { basename } from "node:path";
 const xlsx = process.env.PLANCHECK_XLSX,
   docx = process.env.PLANCHECK_DOCX;
-test("첫 진입 안내에서 실제 두 문서 등록과 핵심 항목 확인까지 이동한다", async ({
+test("선택 안내와 고급 경로에서 실제 두 문서 등록과 핵심 항목 확인까지 이동한다", async ({
   page,
 }, info) => {
   test.skip(!xlsx || !docx, "실제 로컬 문서 경로가 필요합니다.");
   await page.goto("/");
+  await page.locator(".optional-help > summary").click();
   const guide = page.getByRole("complementary", { name: "단계 안내" }),
     next = page.getByRole("complementary", { name: "다음 행동" });
   await expect(guide).toContainText("두 문서를 등록하세요");
@@ -16,6 +18,9 @@ test("첫 진입 안내에서 실제 두 문서 등록과 핵심 항목 확인�
   await next.getByRole("button", { name: "Excel 등록" }).click();
   await expect(page.getByLabel(/검토할 Excel/)).toBeFocused();
   await page.getByLabel(/검토할 Excel/).setInputFiles(xlsx!);
+  await page
+    .getByText("추출 요약·원본 보기 · Excel 재무표", { exact: true })
+    .click();
   await expect(
     page.getByText(`원본: ${basename(xlsx!)}`, { exact: true }),
   ).toBeVisible();
@@ -25,6 +30,7 @@ test("첫 진입 안내에서 실제 두 문서 등록과 핵심 항목 확인�
   await next.getByRole("button", { name: "Word 등록" }).click();
   await expect(page.getByLabel(/검토할 Word/)).toBeFocused();
   await page.getByLabel(/검토할 Word/).setInputFiles(docx!);
+  await openSources(page);
   await expect(
     next.getByRole("button", { name: "데이터 확인으로 이동" }),
   ).toBeVisible();
@@ -63,7 +69,7 @@ test("첫 진입 안내에서 실제 두 문서 등록과 핵심 항목 확인�
     path: info.outputPath("core-review.png"),
     fullPage: true,
   });
-  await page.getByRole("button", { name: "3. 검수 결과" }).click();
+  await openAdvanced(page);
   await expect(guide).toContainText("차이와 원본 근거를 검토하세요");
   await expect(page.getByLabel("결과 필터")).toHaveValue("판정 결과");
   await expect(

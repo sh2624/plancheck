@@ -177,7 +177,7 @@ export function RecommendationCenter(props: Props) {
     </details>
   );
 }
-function RecommendationDetail({
+export function RecommendationDetail({
   recommendation: r,
   items,
   onEdit,
@@ -185,7 +185,12 @@ function RecommendationDetail({
   onInspect,
   onPlan,
   onApplied,
-}: Props & { recommendation: Recommendation; onApplied: () => void }) {
+  headline,
+}: Props & {
+  recommendation: Recommendation;
+  onApplied: () => void;
+  headline?: string;
+}) {
   const [ack, setAck] = useState(false);
   const members = r.candidateIds
     .map((id) => items.find((c) => c.id === id))
@@ -206,9 +211,7 @@ function RecommendationDetail({
   };
   return (
     <section className="recommendation-detail" aria-label="추천 근거 검토">
-      <h3>
-        {r.kind} · {r.title}
-      </h3>
+      <h3>{headline ?? `${r.kind} · ${r.title}`}</h3>
       <p>{r.reason}</p>
       {[...r.risks, ...r.missing].map((n, i) => (
         <p className="warning" key={i}>

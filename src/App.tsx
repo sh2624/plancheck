@@ -34,6 +34,8 @@ import { coreCandidates, reviewProgress } from "./presentation/workflow";
 import { validateAll } from "./validation/engine";
 import { validatePlanning } from "./planning/engine";
 import { presentResult } from "./presentation/results";
+import { inspectDocuments } from "./inspection/analyze";
+import { InspectionResults } from "./components/InspectionResults";
 /** 원본 추출과 사용자 확인 상태를 관리하며 파일 교체 시 관련 연결을 해제한다. */
 export default function App() {
   const revision = useRef(0);
@@ -44,6 +46,8 @@ export default function App() {
     results: true,
   });
   const [registered, setRegistered] = useState({ XLSX: false, DOCX: false });
+  const [inspectionStarted, setInspectionStarted] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [focusIds, setFocusIds] = useState<string[]>([]);
   const [planning, setPlanning] = useState(emptyPlanning);
   const [sourceReferences, setSourceReferences] = useState<EvidenceRef[]>([]);
@@ -75,6 +79,19 @@ export default function App() {
     [review.items, review.links, planning, sourceReferences],
   );
   const coreIds = coreCandidates(review.items, recommendations);
+  const findings = useMemo(
+    () =>
+      inspectionStarted
+        ? inspectDocuments({
+            items: review.items,
+            links: review.links,
+            calculations,
+            planning,
+            references: sourceReferences,
+          })
+        : [],
+    [inspectionStarted, review, calculations, planning, sourceReferences],
+  );
   const progress = reviewProgress(review.items, coreIds);
   const results = useMemo(
     () => [
@@ -194,6 +211,7 @@ export default function App() {
   /** 판정에 사용한 항목과 일치하는 추천 또는 구조화 확인 화면으로 안내한다. */
   function prepare(result: Result) {
     setStep("results");
+    setAdvancedOpen(true);
     const exact = recommendations.find(
       (r) =>
         (r.calculation && `calc:${r.calculation.id}` === result.id) ||
@@ -243,6 +261,8 @@ export default function App() {
     });
   }
   function openPlan(r: Recommendation) {
+    setStep("results");
+    setAdvancedOpen(true);
     revision.current++;
     let focus = r.planFocus;
     if (!focus) {
@@ -263,6 +283,7 @@ export default function App() {
     fingerprint?: string,
   ) {
     revision.current++;
+    setInspectionStarted(false);
     setDocuments((prev) => {
       const nextDocs = { ...prev };
       if (fingerprint !== undefined || next.length || references.length)
@@ -408,12 +429,15 @@ export default function App() {
         <div className="intro">
           <h1>
             {step === "raw"
-              ? "문서 등록"
+              ? "재무설계 문서 검사"
               : step === "review"
-                ? "데이터 확인"
-                : "검수 결과"}
+                ? "상세 검토"
+                : "검사 결과"}
           </h1>
-          <p>문서에서 재무 항목 후보를 찾고 단위와 적용 범위를 확인합니다.</p>
+          <p>
+            Excel 재무표와 Word 보고서를 대조해 숫자 차이와 계획의 확인 지점을
+            찾습니다.
+          </p>
         </div>
         <nav className="steps" aria-label="작업 단계">
           <Button
@@ -422,7 +446,15 @@ export default function App() {
             aria-current={step === "raw" ? "step" : undefined}
             onClick={() => setStep("raw")}
           >
-            1. 문서 등록
+            1. 검사 시작
+          </Button>
+          <Button
+            variant={step === "results" ? "default" : "outline"}
+            aria-pressed={step === "results"}
+            aria-current={step === "results" ? "step" : undefined}
+            onClick={() => setStep("results")}
+          >
+            2. 검사 결과
           </Button>
           <Button
             variant={step === "review" ? "default" : "outline"}
@@ -433,60 +465,42 @@ export default function App() {
               setStep("review");
             }}
           >
-            2. 데이터 확인 ({review.items.filter((c) => !c.excluded).length})
-          </Button>
-          <Button
-            variant={step === "results" ? "default" : "outline"}
-            aria-pressed={step === "results"}
-            aria-current={step === "results" ? "step" : undefined}
-            onClick={() => setStep("results")}
-          >
-            3. 검수 결과
+            3. 상세 검토 ({review.items.filter((c) => !c.excluded).length})
           </Button>
         </nav>
         <p className="muted">
-          3단계 중 {step === "raw" ? 1 : step === "review" ? 2 : 3}단계 ·{" "}
+          3단계 중 {step === "raw" ? 1 : step === "review" ? 3 : 2}단계 ·{" "}
           {step === "raw"
-            ? "문서 등록"
+            ? "검사 시작"
             : step === "review"
-              ? "데이터 확인"
-              : "검수 결과"}
+              ? "상세 검토"
+              : "검사 결과"}
         </p>
-        <StepGuide
-          step={step}
-          open={guides[step]}
-          onToggle={() =>
-            setGuides((prev) => ({ ...prev, [step]: !prev[step] }))
-          }
-        />
-        <aside className="next-action" aria-label="다음 행동">
-          <div>
-            <strong>다음 할 일</strong>
-            <p>{next.text}</p>
-          </div>
-          <Button onClick={next.run}>{next.label}</Button>
-        </aside>
+        <details className="optional-help">
+          <summary>상세 작업 안내</summary>
+          <StepGuide
+            step={step}
+            open={guides[step]}
+            onToggle={() =>
+              setGuides((prev) => ({ ...prev, [step]: !prev[step] }))
+            }
+          />
+          <aside className="next-action" aria-label="다음 행동">
+            <div>
+              <strong>다음 할 일</strong>
+              <p>{next.text}</p>
+            </div>
+            <Button onClick={next.run}>{next.label}</Button>
+          </aside>
+        </details>
         <div className="scope">
-          파일은 외부 서버로 전송하지 않습니다. 추출 후보와 문서 간 연결은
-          사용자 확인 대상입니다. 확인된 값과 선택한 계산 범위·승인 연결에
-          한정해 검증합니다.
+          XLSX·DOCX만 지원합니다. 파일은 브라우저에서 처리하며 외부로 전송하지
+          않습니다. 자동 발견은 확인 후보이며, 최종 오류 판정은 사용자 승인과
+          적용 조건 확인 후에 이루어집니다.
         </div>
-        {step === "raw" &&
-          registered.XLSX &&
-          registered.DOCX &&
-          review.items.length > 0 && (
-            <aside className="upload-next">
-              <span>
-                전체 항목을 확인할 필요 없이 핵심 추천부터 검토할 수 있습니다.
-              </span>
-              <Button variant="outline" onClick={() => setStep("results")}>
-                핵심 추천 {recommendations.filter((r) => r.primary).length}건
-                검토
-              </Button>
-            </aside>
-          )}
         <div className="workspace" hidden={step !== "raw"}>
           <DocumentPanel
+            compact
             extension="xlsx"
             title="Excel 재무표"
             parse={parseXlsx}
@@ -511,6 +525,7 @@ export default function App() {
             {(data) => <WorkbookView data={data} showSource={false} />}
           </DocumentPanel>
           <DocumentPanel
+            compact
             extension="docx"
             title="Word 보고서"
             parse={parseDocx}
@@ -535,6 +550,31 @@ export default function App() {
             {(data) => <WordView data={data} showSource={false} />}
           </DocumentPanel>
         </div>
+        {step === "raw" && (
+          <div className="inspection-start">
+            <div>
+              <strong>
+                {registered.XLSX && registered.DOCX
+                  ? "두 문서가 준비됐습니다"
+                  : "Excel과 Word 파일을 각각 등록하세요"}
+              </strong>
+              <p>
+                계산·문서 간 수치·자금 배정·계획 후보를 자동 분석합니다. 규칙을
+                먼저 설정할 필요가 없습니다.
+              </p>
+            </div>
+            <Button
+              disabled={!registered.XLSX || !registered.DOCX}
+              onClick={() => {
+                setInspectionStarted(true);
+                setStep("results");
+                setAdvancedOpen(false);
+              }}
+            >
+              검사 시작
+            </Button>
+          </div>
+        )}
         {step === "review" && (
           <ReviewView
             key={focusIds.join("|") || "review"}
@@ -557,67 +597,94 @@ export default function App() {
           />
         )}
         {step === "results" && (
-          <ResultsView
-            calculationFocus={calculationFocus}
-            onPrepare={prepare}
-            approvalVersion={approvalVersion}
-            recommendationPanel={
-              <RecommendationCenter
-                key={recommendationFocus?.request ?? "recommendations"}
-                focus={recommendationFocus}
-                recommendations={recommendations}
+          <>
+            <InspectionResults
+              onPrepare={prepare}
+              started={inspectionStarted}
+              findings={findings}
+              items={review.items}
+              links={review.links}
+              calculations={calculations}
+              planning={planning}
+              references={sourceReferences}
+              onEdit={edit}
+              onApply={apply}
+              onInspect={inspect}
+              onPlan={openPlan}
+              onStart={() => setStep("raw")}
+            />
+            <details
+              className="advanced-workspace"
+              open={advancedOpen}
+              onToggle={(e) => setAdvancedOpen(e.currentTarget.open)}
+            >
+              <summary>고급 검사 설정·승인 결과</summary>
+              <ResultsView
+                calculationFocus={calculationFocus}
+                onPrepare={prepare}
+                approvalVersion={approvalVersion}
+                recommendationPanel={
+                  <RecommendationCenter
+                    key={recommendationFocus?.request ?? "recommendations"}
+                    focus={recommendationFocus}
+                    recommendations={recommendations}
+                    items={review.items}
+                    links={review.links}
+                    calculations={calculations}
+                    onEdit={edit}
+                    onApply={apply}
+                    onInspect={inspect}
+                    onPlan={openPlan}
+                  />
+                }
+                sessionPanel={
+                  <SessionReview
+                    getRevision={() => revision.current}
+                    items={review.items}
+                    links={review.links}
+                    documents={documents}
+                    onRestore={(next) => {
+                      revision.current++;
+                      setReview(next);
+                      setCalculations((prev) =>
+                        prev.map((c) => ({ ...c, scopeConfirmed: false })),
+                      );
+                      setPlanning((prev) => ({
+                        ...prev,
+                        allocations: prev.allocations.map((r) => ({
+                          ...r,
+                          confirmed: false,
+                        })),
+                        funds: prev.funds.map((r) => ({
+                          ...r,
+                          confirmed: false,
+                        })),
+                        actions: prev.actions.map((r) => ({
+                          ...r,
+                          confirmed: false,
+                        })),
+                      }));
+                    }}
+                  />
+                }
+                planFocus={planFocus}
+                planning={planning}
+                references={sourceReferences}
+                onPlanningChange={(next) => {
+                  revision.current++;
+                  setPlanning(next);
+                }}
                 items={review.items}
                 links={review.links}
                 calculations={calculations}
-                onEdit={edit}
-                onApply={apply}
-                onInspect={inspect}
-                onPlan={openPlan}
-              />
-            }
-            sessionPanel={
-              <SessionReview
-                getRevision={() => revision.current}
-                items={review.items}
-                links={review.links}
-                documents={documents}
-                onRestore={(next) => {
+                onChange={(next) => {
                   revision.current++;
-                  setReview(next);
-                  setCalculations((prev) =>
-                    prev.map((c) => ({ ...c, scopeConfirmed: false })),
-                  );
-                  setPlanning((prev) => ({
-                    ...prev,
-                    allocations: prev.allocations.map((r) => ({
-                      ...r,
-                      confirmed: false,
-                    })),
-                    funds: prev.funds.map((r) => ({ ...r, confirmed: false })),
-                    actions: prev.actions.map((r) => ({
-                      ...r,
-                      confirmed: false,
-                    })),
-                  }));
+                  setCalculations(next);
                 }}
+                onInspect={inspect}
               />
-            }
-            planFocus={planFocus}
-            planning={planning}
-            references={sourceReferences}
-            onPlanningChange={(next) => {
-              revision.current++;
-              setPlanning(next);
-            }}
-            items={review.items}
-            links={review.links}
-            calculations={calculations}
-            onChange={(next) => {
-              revision.current++;
-              setCalculations(next);
-            }}
-            onInspect={inspect}
-          />
+            </details>
+          </>
         )}
       </main>
       <footer>PlanCheck · 재무 문서 검수</footer>

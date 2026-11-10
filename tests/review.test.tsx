@@ -1,3 +1,4 @@
+import { openAdvancedResults } from "./workflow-ui";
 import { afterEach, it, expect, vi } from "vitest";
 import {
   cleanup,
@@ -63,7 +64,7 @@ async function upload() {
   });
   await screen.findByText("원본: test.xlsx");
   await screen.findByText(/원본: test.docx/);
-  fireEvent.click(screen.getByRole("button", { name: /2. 데이터 확인/ }));
+  fireEvent.click(screen.getByRole("button", { name: /3. 상세 검토/ }));
   return screen.getByRole("region", { name: "데이터 확인" });
 }
 function approve(region: HTMLElement) {
@@ -133,9 +134,9 @@ it("제외·복원·직접 추가를 지원하고 파일 초기화 시 관련 �
   });
   expect(within(region).getAllByLabelText("숫자")).toHaveLength(2);
   approve(region);
-  fireEvent.click(screen.getByRole("button", { name: "1. 문서 등록" }));
+  fireEvent.click(screen.getByRole("button", { name: "1. 검사 시작" }));
   fireEvent.click(screen.getByRole("button", { name: "Excel 재무표 초기화" }));
-  fireEvent.click(screen.getByRole("button", { name: /2. 데이터 확인/ }));
+  fireEvent.click(screen.getByRole("button", { name: /3. 상세 검토/ }));
   expect(screen.getByRole("heading", { name: "승인한 연결 0개" })).toBeTruthy();
   expect(screen.getAllByLabelText("숫자")).toHaveLength(1);
   fireEvent.click(screen.getByRole("button", { name: "항목 직접 추가" }));
@@ -177,7 +178,7 @@ it("확인한 승인 연결만 결과에 표시하고 편집 후 오래된 판�
     fireEvent.click(within(row).getByRole("button", { name: "확인 완료" }));
   }
   approve(region);
-  fireEvent.click(screen.getByRole("button", { name: "3. 검수 결과" }));
+  openAdvancedResults();
   expect(
     screen.getByText("오류", { exact: true, selector: "span" }),
   ).toBeTruthy();
@@ -190,7 +191,7 @@ it("확인한 승인 연결만 결과에 표시하고 편집 후 오래된 판�
   fireEvent.change(screen.getAllByLabelText("숫자")[0], {
     target: { value: "320" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "3. 검수 결과" }));
+  openAdvancedResults();
   expect(screen.queryByRole("button", { name: /CROSS_VALUE/ })).toBeNull();
   expect(
     screen.queryByText("오류", { exact: true, selector: "span" }),

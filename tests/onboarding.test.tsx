@@ -1,3 +1,4 @@
+import { openAdvancedResults, openHelp } from "./workflow-ui";
 import { afterEach, it, expect, vi } from "vitest";
 import {
   render,
@@ -28,7 +29,8 @@ it("금리 표시 잡음을 줄여도 원본 숫자와 작은 금리 값은 보�
 });
 it("추천이 없는 계산 준비 항목은 실제 계산 구성 편집 위치를 연다", () => {
   render(<App />);
-  fireEvent.click(screen.getByRole("button", { name: "3. 검수 결과" }));
+  openHelp();
+  openAdvancedResults();
   fireEvent.click(screen.getByText(/검증 준비 중 5건/));
   fireEvent.click(
     screen.getAllByRole("button", { name: "필요한 항목 확인" })[0],
@@ -40,30 +42,32 @@ it("추천이 없는 계산 준비 항목은 실제 계산 구성 편집 위치�
     "assets",
   );
 });
-it("각 단계 안내를 처음 표시하고 단계별 닫기 상태와 다시 열기를 유지한다", () => {
+it("선택한 고급 작업 안내의 단계별 닫기 상태와 다시 열기를 유지한다", () => {
   render(<App />);
+  openHelp();
   const guide = () => screen.getByRole("complementary", { name: "단계 안내" });
   expect(guide().textContent).toContain("두 문서를 등록하세요");
   fireEvent.click(within(guide()).getByRole("button", { name: "안내 닫기" }));
   expect(guide().textContent).not.toContain("두 문서를 등록하세요");
-  fireEvent.click(screen.getByRole("button", { name: /2. 데이터 확인/ }));
+  fireEvent.click(screen.getByRole("button", { name: /3. 상세 검토/ }));
   expect(guide().textContent).toContain("검증에 필요한 값만 확인하세요");
-  fireEvent.click(screen.getByRole("button", { name: "3. 검수 결과" }));
+  openAdvancedResults();
   expect(guide().textContent).toContain("차이와 원본 근거를 검토하세요");
-  fireEvent.click(screen.getByRole("button", { name: "1. 문서 등록" }));
+  fireEvent.click(screen.getByRole("button", { name: "1. 검사 시작" }));
   fireEvent.click(
     within(guide()).getByRole("button", { name: "안내 다시 보기" }),
   );
   expect(guide().textContent).toContain("두 문서를 등록하세요");
   expect(
     screen
-      .getByRole("button", { name: "1. 문서 등록" })
+      .getByRole("button", { name: "1. 검사 시작" })
       .getAttribute("aria-current"),
   ).toBe("step");
 });
 it("어느 단계에서도 누락 파일 등록 위치로 이동하고 초점을 맞춘다", async () => {
   render(<App />);
-  fireEvent.click(screen.getByRole("button", { name: "3. 검수 결과" }));
+  openHelp();
+  openAdvancedResults();
   const next = screen.getByRole("complementary", { name: "다음 행동" });
   expect(next.textContent).toContain("Excel 재무표가 없습니다");
   fireEvent.click(within(next).getByRole("button", { name: "Excel 등록" }));
