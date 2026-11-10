@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "./ui/button";
 import { fieldLabels, units } from "../normalization/types";
 import type { Candidate, Link, Field, Unit } from "../normalization/types";
@@ -25,6 +25,13 @@ export function ReviewView({
   onUnlink,
   focusIds = [],
 }: Props) {
+  const root = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (focusIds.length) {
+      root.current?.scrollIntoView?.({ block: "start", behavior: "smooth" });
+      root.current?.focus({ preventScroll: true });
+    }
+  }, [focusIds]);
   const [filter, setFilter] = useState(focusIds.length ? "관련 항목" : "전체"),
     [page, setPage] = useState(0),
     [a, setA] = useState(""),
@@ -55,7 +62,12 @@ export function ReviewView({
       ? `${c.label} · ${c.number || "값 없음"} ${c.unit} · ${c.location} · ${c.asOf || "기준일 미확인"} · ${c.period || "기간 미확인"} · ${c.scenario || "시나리오 미확인"}`
       : "삭제된 항목";
   return (
-    <section className="review" aria-label="데이터 확인">
+    <section
+      ref={root}
+      tabIndex={-1}
+      className="review"
+      aria-label="데이터 확인"
+    >
       <div className="review-toolbar">
         <h2>재무 항목 후보</h2>
         <span className="muted">

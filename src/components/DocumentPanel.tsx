@@ -2,14 +2,15 @@ import { useRef, useState } from "react";
 import { FileSpreadsheet, FileText, X } from "lucide-react";
 import { Button } from "./ui/button";
 import { validateFile } from "../parsers/package";
+import { digest } from "../session/checkpoint";
 type Props<T> = {
   extension: "xlsx" | "docx";
   title: string;
   parse: (data: ArrayBuffer, name: string) => Promise<T>;
   children: (data: T) => React.ReactNode;
-  onData?: (data: T | undefined) => void;
+  onData?: (data: T | undefined, fingerprint?: string) => void;
 };
-/** 파일 변경 시 결과를 즉시 비우고 오래된 비동기 응답을 폐기한다. */
+/** 파일 변경 시 결과를 비우고 원본 지문과 최신 파싱 응답만 전달한다. */
 export function DocumentPanel<T>({
   extension,
   title,
@@ -40,10 +41,17 @@ export function DocumentPanel<T>({
     try {
       validateFile(file, extension);
       setBusy(true);
-      const result = await parse(await file.arrayBuffer(), file.name);
+      const bytes = await file.arrayBuffer();
+      const result = await parse(bytes, file.name);
+      let fingerprint: string | undefined;
+      try {
+        if (crypto.subtle) fingerprint = await digest(bytes);
+      } catch {
+        /* 파싱은 유지하고 세션 복원만 제한한다. */
+      }
       if (version === generation.current) {
         setData(result);
-        onData?.(result);
+        onData?.(result, fingerprint);
       }
     } catch (err) {
       if (version === generation.current)

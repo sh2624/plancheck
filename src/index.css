@@ -547,3 +547,83 @@ footer {
   border-top: 1px solid #dce1e7;
   font-size: 12px;
 }
+
+.recommendation-center,
+.session-review {
+  margin: 16px 20px;
+  border: 1px solid #dce1e7;
+  padding: 12px;
+  border-radius: 3px;
+}
+.recommendation-center > summary,
+.session-review > summary {
+  font-size: 14px;
+  font-weight: 600;
+}
+.recommendation-center > .notice {
+  margin: 12px 0;
+}
+.recommendation-filters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 12px 0;
+  font-size: 12px;
+}
+.recommendation-detail {
+  padding-top: 16px;
+  border-top: 1px solid #dce1e7;
+  font-size: 12px;
+}
+.recommendation-detail > p {
+  margin-top: 6px;
+}
+.recommendation-detail .table-scroll {
+  margin-top: 12px;
+  max-height: 500px;
+}
+.recommendation-detail label {
+  display: block;
+  margin-bottom: 8px;
+}
+.recommendation-detail input:not([type="checkbox"]),
+.recommendation-detail select {
+  display: block;
+  max-width: 100%;
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  padding: 5px 8px;
+  border-radius: 3px;
+  margin-top: 4px;
+  background: white;
+}
+.recommendation-detail td {
+  min-width: 180px;
+}
+.recommendation-detail td:first-child {
+  min-width: 260px;
+}
+.recommendation-detail td details {
+  margin: 8px 0;
+}
+.session-review > p {
+  margin-top: 10px;
+  font-size: 12px;
+}
+.result-counts button {
+  padding: 2px 0;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.upload-next {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  border-bottom: 1px solid #dce1e7;
+  padding: 0 0 16px;
+  margin-bottom: 18px;
+  font-size: 13px;
+}

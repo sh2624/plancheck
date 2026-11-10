@@ -1,4 +1,5 @@
-﻿import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
+import type { ReactNode } from "react";
 import type { Candidate, Link } from "../normalization/types";
 import { Button } from "./ui/button";
 import { newCalculation, rules, ruleTitles } from "../validation/types";
@@ -10,6 +11,13 @@ import type { Planning } from "../planning/types";
 import type { EvidenceRef } from "../validation/types";
 import { PlanningEditor } from "./PlanningEditor";
 type Props = {
+  recommendationPanel?: ReactNode;
+  sessionPanel?: ReactNode;
+  planFocus?: {
+    kind: "allocations" | "funds" | "actions";
+    id: string;
+    request: string;
+  };
   planning?: Planning;
   references?: EvidenceRef[];
   onPlanningChange?: (next: Planning) => void;
@@ -27,6 +35,9 @@ const statusClass: Record<Status, string> = {
 };
 /** 선택 범위 설정과 현재 데이터로 계산한 결과를 표시하며 모든 판정의 원본 근거를 연다. */
 export function ResultsView({
+  recommendationPanel,
+  sessionPanel,
+  planFocus,
   planning = emptyPlanning(),
   references = [],
   onPlanningChange,
@@ -46,10 +57,26 @@ export function ResultsView({
     ],
     [items, links, calculations, planning],
   );
-  const visible = results.filter(
-    (r) => filter === "전체" || r.status === filter,
-  );
+  const priority: Record<Status, number> = {
+    오류: 0,
+    "확인 필요": 1,
+    "검증 통과": 2,
+    "검증 불가": 3,
+  };
+  const visible = results
+    .filter((r) => filter === "전체" || r.status === filter)
+    .sort((a, b) => priority[a.status] - priority[b.status]);
   const detail = results.find((r) => r.id === selected);
+  const detailRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (selected) {
+      detailRef.current?.scrollIntoView?.({
+        block: "start",
+        behavior: "smooth",
+      });
+      detailRef.current?.focus({ preventScroll: true });
+    }
+  }, [selected]);
   const describe = (c: Candidate) =>
     `${c.label} · ${c.number} ${c.unit} · ${c.source} ${c.location} · ${c.period || "기간 미확인"} · ${c.confirmed ? "확인됨" : "미확인"}`;
   function update(id: string, patch: Partial<Calculation>) {
@@ -96,7 +123,10 @@ export function ResultsView({
     </label>
   );
   return (
-    <section className="results" aria-label="검수 결과">
+    <section
+      className={`results ${recommendationPanel ? "results-prioritized" : ""}`}
+      aria-label="검수 결과"
+    >
       <div className="review-toolbar">
         <h2>핵심 검증</h2>
         <span className="muted">
@@ -108,7 +138,155 @@ export function ResultsView({
         선택하세요. 같은 항목의 반복 출현과 소계를 함께 합산하지 마세요.
         기준일·시나리오·확정 여부가 불명확하면 확정 오류로 판정하지 않습니다.
       </p>
-      <details className="calculation-settings" open>
+      <div className="result-counts">
+        {(["오류", "확인 필요", "검증 통과", "검증 불가"] as const).map(
+          (status) => (
+            <button
+              type="button"
+              key={status}
+              className={statusClass[status]}
+              aria-pressed={filter === status}
+              onClick={() => setFilter(filter === status ? "전체" : status)}
+            >
+              {status} {results.filter((r) => r.status === status).length}
+            </button>
+          ),
+        )}
+      </div>
+      {recommendationPanel && (
+        <div className="recommendation-panel">{recommendationPanel}</div>
+      )}
+      <label className="review-filter">
+        결과 필터
+        <select value={filter} onChange={(e) => setFilter(e.target.value)}>
+          {["전체", "오류", "확인 필요", "검증 통과", "검증 불가"].map((s) => (
+            <option key={s}>{s}</option>
+          ))}
+        </select>
+      </label>
+      <div className="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>코드 / 제목</th>
+              <th>상태</th>
+              <th>Excel 값·위치</th>
+              <th>Word 값·위치</th>
+              <th>문서값 / 비교·계산값 / 차이</th>
+              <th>판단 근거 / 확인 사항</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visible.map((r) => (
+              <tr key={r.id}>
+                <td>
+                  <Button variant="outline" onClick={() => setSelected(r.id)}>
+                    {r.code} · {r.title}
+                  </Button>
+                </td>
+                <td>
+                  <span className={statusClass[r.status]}>{r.status}</span>
+                </td>
+                {(["XLSX", "DOCX"] as const).map((source) => (
+                  <td key={source}>
+                    {r.evidence
+                      .filter((c) => c.source === source)
+                      .map((c, i) => (
+                        <p key={`${c.id}:${i}`}>
+                          {c.label}: {c.number} {c.unit}
+                          <br />
+                          {c.fileName} · {c.location}
+                        </p>
+                      ))}
+                    {r.references
+                      ?.filter((ref) => ref.source === source)
+                      .map((ref, i) => (
+                        <p key={`ref:${i}`}>
+                          {ref.fileName} · {ref.location}
+                        </p>
+                      ))}
+                  </td>
+                ))}
+                <td>
+                  <p>
+                    문서값: {r.actual ?? "—"} {r.unit}
+                  </p>
+                  <p>
+                    비교·계산값: {r.expected ?? "—"} {r.unit}
+                  </p>
+                  <p>
+                    차이: {r.difference ?? "—"} {r.unit === "%" ? "%p" : r.unit}
+                  </p>
+                </td>
+                <td>
+                  <p>{r.basis}</p>
+                  {r.needs.map((n, i) => (
+                    <p className="warning" key={i}>
+                      {n}
+                    </p>
+                  ))}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {!visible.length && (
+        <p className="empty">
+          {results.length
+            ? "선택한 상태의 결과가 없습니다. 다른 상태나 전체 결과를 확인하세요."
+            : "표시할 검증 결과가 없습니다. 계산을 설정하거나 문서 간 연결을 승인하세요."}
+        </p>
+      )}
+      {detail && (
+        <section
+          ref={detailRef}
+          tabIndex={-1}
+          className="result-detail"
+          aria-label="검증 근거 상세"
+        >
+          <h3>
+            {detail.code} · {detail.title} · {detail.status}
+          </h3>
+          <p>{detail.basis}</p>
+          {detail.needs.map((n, i) => (
+            <p className="warning" key={i}>
+              {n}
+            </p>
+          ))}
+          {detail.evidence.map((c, i) => (
+            <article key={`${c.id}:${i}`}>
+              <strong>{describe(c)}</strong>
+              <p>
+                {c.fileName} · 기준일 {c.asOf || "미확인"} · 시나리오{" "}
+                {c.scenario || "미확인"} · {c.certainty}
+              </p>
+              <p className="pre">{c.originalText || "직접 입력"}</p>
+              <p>
+                원본 숫자 {c.originalNumber ?? "없음"} · 현재 정규화 값{" "}
+                {c.normalizedValue ?? "미확인"}
+              </p>
+            </article>
+          ))}
+          {detail.references?.map((ref, i) => (
+            <article key={`ref:${i}`}>
+              <strong>
+                {ref.source} · {ref.fileName} · {ref.location}
+              </strong>
+              <p className="pre">{ref.originalText}</p>
+            </article>
+          ))}
+          <Button
+            disabled={!detail.evidence.length}
+            variant="outline"
+            onClick={() => onInspect(detail.evidence.map((c) => c.id))}
+          >
+            관련 항목 확인·수정
+          </Button>
+        </section>
+      )}
+      {sessionPanel && <div className="session-panel">{sessionPanel}</div>}
+      <details className="calculation-settings" open={!recommendationPanel}>
         <summary>계산 범위 및 대출 조건</summary>
         <p className="muted">
           복수 선택은 Ctrl 또는 Shift와 함께 선택합니다. 합계 검증은 선택한
@@ -267,143 +445,14 @@ export function ResultsView({
       </details>
       {onPlanningChange && (
         <PlanningEditor
+          key={planFocus?.request ?? "planning"}
+          focus={planFocus}
+          initiallyOpen={!recommendationPanel || !!planFocus}
           state={planning}
           items={items}
           references={references}
           onChange={onPlanningChange}
         />
-      )}
-      <div className="result-counts">
-        {(["오류", "확인 필요", "검증 통과", "검증 불가"] as const).map(
-          (status) => (
-            <span key={status} className={statusClass[status]}>
-              {status} {results.filter((r) => r.status === status).length}
-            </span>
-          ),
-        )}
-      </div>
-      <label className="review-filter">
-        결과 필터
-        <select value={filter} onChange={(e) => setFilter(e.target.value)}>
-          {["전체", "오류", "확인 필요", "검증 통과", "검증 불가"].map((s) => (
-            <option key={s}>{s}</option>
-          ))}
-        </select>
-      </label>
-      <div className="table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th>코드 / 제목</th>
-              <th>상태</th>
-              <th>Excel 값·위치</th>
-              <th>Word 값·위치</th>
-              <th>문서값 / 비교·계산값 / 차이</th>
-              <th>판단 근거 / 확인 사항</th>
-            </tr>
-          </thead>
-          <tbody>
-            {visible.map((r) => (
-              <tr key={r.id}>
-                <td>
-                  <Button variant="outline" onClick={() => setSelected(r.id)}>
-                    {r.code} · {r.title}
-                  </Button>
-                </td>
-                <td>
-                  <span className={statusClass[r.status]}>{r.status}</span>
-                </td>
-                {(["XLSX", "DOCX"] as const).map((source) => (
-                  <td key={source}>
-                    {r.evidence
-                      .filter((c) => c.source === source)
-                      .map((c, i) => (
-                        <p key={`${c.id}:${i}`}>
-                          {c.label}: {c.number} {c.unit}
-                          <br />
-                          {c.fileName} · {c.location}
-                        </p>
-                      ))}
-                    {r.references
-                      ?.filter((ref) => ref.source === source)
-                      .map((ref, i) => (
-                        <p key={`ref:${i}`}>
-                          {ref.fileName} · {ref.location}
-                        </p>
-                      ))}
-                  </td>
-                ))}
-                <td>
-                  <p>
-                    문서값: {r.actual ?? "—"} {r.unit}
-                  </p>
-                  <p>
-                    비교·계산값: {r.expected ?? "—"} {r.unit}
-                  </p>
-                  <p>
-                    차이: {r.difference ?? "—"} {r.unit === "%" ? "%p" : r.unit}
-                  </p>
-                </td>
-                <td>
-                  <p>{r.basis}</p>
-                  {r.needs.map((n, i) => (
-                    <p className="warning" key={i}>
-                      {n}
-                    </p>
-                  ))}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {!visible.length && (
-        <p className="empty">
-          표시할 검증 결과가 없습니다. 계산을 설정하거나 문서 간 연결을
-          승인하세요.
-        </p>
-      )}
-      {detail && (
-        <section className="result-detail" aria-label="검증 근거 상세">
-          <h3>
-            {detail.code} · {detail.title} · {detail.status}
-          </h3>
-          <p>{detail.basis}</p>
-          {detail.needs.map((n, i) => (
-            <p className="warning" key={i}>
-              {n}
-            </p>
-          ))}
-          {detail.evidence.map((c, i) => (
-            <article key={`${c.id}:${i}`}>
-              <strong>{describe(c)}</strong>
-              <p>
-                {c.fileName} · 기준일 {c.asOf || "미확인"} · 시나리오{" "}
-                {c.scenario || "미확인"} · {c.certainty}
-              </p>
-              <p className="pre">{c.originalText || "직접 입력"}</p>
-              <p>
-                원본 숫자 {c.originalNumber ?? "없음"} · 현재 정규화 값{" "}
-                {c.normalizedValue ?? "미확인"}
-              </p>
-            </article>
-          ))}
-          {detail.references?.map((ref, i) => (
-            <article key={`ref:${i}`}>
-              <strong>
-                {ref.source} · {ref.fileName} · {ref.location}
-              </strong>
-              <p className="pre">{ref.originalText}</p>
-            </article>
-          ))}
-          <Button
-            disabled={!detail.evidence.length}
-            variant="outline"
-            onClick={() => onInspect(detail.evidence.map((c) => c.id))}
-          >
-            관련 항목 확인·수정
-          </Button>
-        </section>
       )}
     </section>
   );

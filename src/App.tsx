@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+﻿import { useState, useMemo, useRef } from "react";
 import { FileCheck2, LockKeyhole } from "lucide-react";
 import { DocumentPanel } from "./components/DocumentPanel";
 import { WorkbookView } from "./components/WorkbookView";
@@ -21,12 +21,26 @@ import {
   wordReferences,
   replacePlanningSource,
 } from "./planning/extract";
+import { newRecord } from "./planning/types";
+import { recommend } from "./recommendations/recommend";
+import { applyRecommendation } from "./recommendations/apply";
+import type { Recommendation } from "./recommendations/types";
+import { RecommendationCenter } from "./components/RecommendationCenter";
+import { SessionReview } from "./components/SessionReview";
+import type { Documents } from "./session/checkpoint";
 /** 원본 추출과 사용자 확인 상태를 관리하며 파일 교체 시 관련 연결을 해제한다. */
 export default function App() {
+  const revision = useRef(0);
   const [step, setStep] = useState<"raw" | "review" | "results">("raw");
   const [focusIds, setFocusIds] = useState<string[]>([]);
   const [planning, setPlanning] = useState(emptyPlanning);
   const [sourceReferences, setSourceReferences] = useState<EvidenceRef[]>([]);
+  const [documents, setDocuments] = useState<Documents>({});
+  const [planFocus, setPlanFocus] = useState<{
+    kind: "allocations" | "funds" | "actions";
+    id: string;
+    request: string;
+  }>();
   const [calculations, setCalculations] = useState<Calculation[]>(() =>
     Object.keys(ruleTitles).map((rule) => newCalculation(rule as Rule, rule)),
   );
@@ -34,11 +48,48 @@ export default function App() {
     items: [],
     links: [],
   });
+  const recommendations = useMemo(
+    () => recommend(review.items, review.links, planning, sourceReferences),
+    [review.items, review.links, planning, sourceReferences],
+  );
+  function inspect(ids: string[]) {
+    setFocusIds(ids);
+    setStep("review");
+  }
+  function apply(r: Recommendation, approve: boolean) {
+    revision.current++;
+    const next = applyRecommendation({ ...review, calculations }, r, approve);
+    setReview({ items: next.items, links: next.links });
+    setCalculations(next.calculations);
+  }
+  function openPlan(r: Recommendation) {
+    revision.current++;
+    let focus = r.planFocus;
+    if (!focus) {
+      const row = r.allocation ?? newRecord("allocation", crypto.randomUUID());
+      setPlanning((prev) =>
+        prev.allocations.some((a) => a.id === row.id)
+          ? prev
+          : { ...prev, allocations: [row, ...prev.allocations] },
+      );
+      focus = { kind: "allocations", id: row.id };
+    }
+    setPlanFocus({ ...focus, request: crypto.randomUUID() });
+  }
   function replaceSource(
     source: Candidate["source"],
     next: Candidate[],
     references: EvidenceRef[] = [],
+    fingerprint?: string,
   ) {
+    revision.current++;
+    setDocuments((prev) => {
+      const nextDocs = { ...prev };
+      if (fingerprint !== undefined || next.length || references.length)
+        nextDocs[source] = fingerprint ?? "";
+      else delete nextDocs[source];
+      return nextDocs;
+    });
     const replaced = new Set(
       review.items.filter((c) => c.source === source).map((c) => c.id),
     );
@@ -71,6 +122,7 @@ export default function App() {
     }));
   }
   function edit(id: string, patch: Partial<Candidate>) {
+    revision.current++;
     setPlanning((prev) => ({
       ...prev,
       allocations: prev.allocations.map((r) =>
@@ -98,6 +150,7 @@ export default function App() {
     }));
   }
   function add() {
+    revision.current++;
     const item: Candidate = {
       id: crypto.randomUUID(),
       source: "XLSX",
@@ -123,6 +176,7 @@ export default function App() {
     setReview((prev) => ({ ...prev, items: [item, ...prev.items] }));
   }
   function link(a: string, b: string) {
+    revision.current++;
     setReview((prev) => {
       const x = prev.items.find(
           (c) => c.id === a && !c.excluded && c.source === "XLSX",
@@ -140,6 +194,22 @@ export default function App() {
         ],
       };
     });
+  }
+  function unlink(id: string) {
+    revision.current++;
+    setReview((prev) => ({
+      ...prev,
+      links: prev.links.filter((l) => l.id !== id),
+    }));
+  }
+  function confirm(id: string) {
+    revision.current++;
+    setReview((prev) => ({
+      ...prev,
+      items: prev.items.map((c) =>
+        c.id === id && canConfirm(c) ? { ...c, confirmed: true } : c,
+      ),
+    }));
   }
   return (
     <>
@@ -196,16 +266,27 @@ export default function App() {
           사용자 확인 대상입니다. 확인된 값과 선택한 계산 범위·승인 연결에
           한정해 검증합니다.
         </div>
+        {step === "raw" && review.items.length > 0 && (
+          <aside className="upload-next">
+            <span>
+              전체 항목을 확인할 필요 없이 핵심 추천부터 검토할 수 있습니다.
+            </span>
+            <Button onClick={() => setStep("results")}>
+              핵심 추천 {recommendations.filter((r) => r.primary).length}건 검토
+            </Button>
+          </aside>
+        )}
         <div className="workspace" hidden={step !== "raw"}>
           <DocumentPanel
             extension="xlsx"
             title="Excel 재무표"
             parse={parseXlsx}
-            onData={(data) =>
+            onData={(data, fingerprint) =>
               replaceSource(
                 "XLSX",
                 data ? extractWorkbook(data) : [],
                 data ? workbookReferences(data) : [],
+                fingerprint,
               )
             }
           >
@@ -215,11 +296,12 @@ export default function App() {
             extension="docx"
             title="Word 보고서"
             parse={parseDocx}
-            onData={(data) =>
+            onData={(data, fingerprint) =>
               replaceSource(
                 "DOCX",
                 data ? extractWord(data) : [],
                 data ? wordReferences(data) : [],
+                fingerprint,
               )
             }
           >
@@ -234,39 +316,70 @@ export default function App() {
             onEdit={edit}
             onAdd={add}
             onLink={link}
-            onUnlink={(id) =>
-              setReview((prev) => ({
-                ...prev,
-                links: prev.links.filter((l) => l.id !== id),
-              }))
-            }
-            onConfirm={(id) =>
-              setReview((prev) => ({
-                ...prev,
-                items: prev.items.map((c) =>
-                  c.id === id && canConfirm(c) ? { ...c, confirmed: true } : c,
-                ),
-              }))
-            }
+            onUnlink={unlink}
+            onConfirm={confirm}
           />
         )}
         {step === "results" && (
           <ResultsView
+            recommendationPanel={
+              <RecommendationCenter
+                recommendations={recommendations}
+                items={review.items}
+                links={review.links}
+                calculations={calculations}
+                onEdit={edit}
+                onApply={apply}
+                onInspect={inspect}
+                onPlan={openPlan}
+              />
+            }
+            sessionPanel={
+              <SessionReview
+                getRevision={() => revision.current}
+                items={review.items}
+                links={review.links}
+                documents={documents}
+                onRestore={(next) => {
+                  revision.current++;
+                  setReview(next);
+                  setCalculations((prev) =>
+                    prev.map((c) => ({ ...c, scopeConfirmed: false })),
+                  );
+                  setPlanning((prev) => ({
+                    ...prev,
+                    allocations: prev.allocations.map((r) => ({
+                      ...r,
+                      confirmed: false,
+                    })),
+                    funds: prev.funds.map((r) => ({ ...r, confirmed: false })),
+                    actions: prev.actions.map((r) => ({
+                      ...r,
+                      confirmed: false,
+                    })),
+                  }));
+                }}
+              />
+            }
+            planFocus={planFocus}
             planning={planning}
             references={sourceReferences}
-            onPlanningChange={setPlanning}
+            onPlanningChange={(next) => {
+              revision.current++;
+              setPlanning(next);
+            }}
             items={review.items}
             links={review.links}
             calculations={calculations}
-            onChange={setCalculations}
-            onInspect={(ids) => {
-              setFocusIds(ids);
-              setStep("review");
+            onChange={(next) => {
+              revision.current++;
+              setCalculations(next);
             }}
+            onInspect={inspect}
           />
         )}
       </main>
-      <footer>PlanCheck · 문서 추출 및 데이터 확인</footer>
+      <footer>PlanCheck · 재무 문서 검수</footer>
     </>
   );
 }

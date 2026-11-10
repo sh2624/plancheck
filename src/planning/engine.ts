@@ -266,6 +266,14 @@ export function validateConditionalFunds(
           status: "확인 필요" as const,
           needs: ["시나리오를 확인하세요."],
         };
+      if (row.approval === "미확인" || row.received === "미확인")
+        return {
+          ...next,
+          status: "확인 필요" as const,
+          needs: [
+            "승인·수령 여부가 미확인입니다. 예상 시나리오라도 먼저 해당 상태를 확인하세요.",
+          ],
+        };
       if (row.destination === "예상 시나리오" || row.destination === "미반영")
         return {
           ...next,

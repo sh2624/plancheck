@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { Candidate } from "../normalization/types";
 import { units } from "../normalization/types";
 import type { EvidenceRef } from "../validation/types";
@@ -13,15 +13,33 @@ import type {
 type Kind = "allocations" | "funds" | "actions";
 type Patch = Partial<Allocation & ConditionalFund & PlanAction>;
 type Props = {
+  focus?: { kind: Kind; id: string };
+  initiallyOpen?: boolean;
   state: Planning;
   items: Candidate[];
   references: EvidenceRef[];
   onChange: (next: Planning) => void;
 };
 /** 자산 배정·조건부 금액·행동 후보를 원본과 연결하고 필요한 항목만 선택적으로 확인한다. */
-export function PlanningEditor({ state, items, references, onChange }: Props) {
-  const [kind, setKind] = useState<Kind>("allocations"),
-    [selected, setSelected] = useState("");
+export function PlanningEditor({
+  state,
+  items,
+  references,
+  onChange,
+  focus,
+  initiallyOpen = true,
+}: Props) {
+  const root = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    if (focus) {
+      root.current?.scrollIntoView?.({ block: "start", behavior: "smooth" });
+      root.current
+        ?.querySelector<HTMLInputElement>("input")
+        ?.focus({ preventScroll: true });
+    }
+  }, [focus]);
+  const [kind, setKind] = useState<Kind>(focus?.kind ?? "allocations"),
+    [selected, setSelected] = useState(focus?.id ?? "");
   const rows = state[kind],
     record = rows.find((r) => r.id === selected) ?? rows[0];
   function update(patch: Patch) {
@@ -102,7 +120,7 @@ export function PlanningEditor({ state, items, references, onChange }: Props) {
     fund = kind === "funds" ? (record as ConditionalFund) : undefined,
     action = kind === "actions" ? (record as PlanAction) : undefined;
   return (
-    <details className="planning-editor" open>
+    <details ref={root} className="planning-editor" open={initiallyOpen}>
       <summary>자금 배정 및 계획 확인</summary>
       <p className="notice">
         문장 후보는 자동 확정하지 않습니다. 자산·목표액은 ‘데이터 확인’에서 먼저
