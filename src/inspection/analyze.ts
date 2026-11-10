@@ -11,7 +11,8 @@ import { recommend } from "../recommendations/recommend";
 import type { Recommendation } from "../recommendations/types";
 import { loanIdentity } from "../recommendations/recommend";
 import { fieldLabels } from "../normalization/types";
-import { displayValue, presentResult } from "../presentation/results";
+import { presentResult } from "../presentation/results";
+import { formatFinancial } from "../presentation/format";
 export type Finding = {
   id: string;
   kind: Recommendation["kind"];
@@ -76,7 +77,7 @@ export function inspectDocuments(input: InspectionInput): Finding[] {
     const title =
       kind === "CROSS"
         ? signal === "수치 차이"
-          ? `${name} 수치가 두 문서에서 ${displayValue(Math.abs(r.difference!), r.unit === "%" ? "%p" : r.unit)} 다릅니다`
+          ? `${name} 수치가 두 문서에서 ${formatFinancial(Math.abs(r.difference!), r.unit === "%" ? "%p" : r.unit, { difference: true })} 다릅니다`
           : signal === "수치 일치"
             ? `${name} 수치가 일치하는 후보입니다`
             : `${name} 비교 조건을 확인해 주세요`
@@ -123,7 +124,7 @@ export function inspectDocuments(input: InspectionInput): Finding[] {
       ...(rec?.risks ?? []),
     ];
     out.push({
-      id: rec?.id ?? r.id,
+      id: kind === "PLAN" || kind === "ALLOC" ? r.id : (rec?.id ?? r.id),
       kind,
       title: approved ? presentResult(approved).headline : title,
       signal,

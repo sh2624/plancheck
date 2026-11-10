@@ -31,16 +31,18 @@ test("검사 시작만으로 차이를 발견하고 선택 검토 후에만 확�
   await expect(results).toContainText("확정 오류 0");
   let credit = results
     .locator(".finding")
-    .filter({ has: page.getByRole("heading", { name: /신용대출 금리.*1%p/ }) });
+    .filter({
+      has: page.getByRole("heading", { name: /신용대출 금리.*1.0%p/ }),
+    });
   await expect(credit).toHaveCount(1);
   await expect(credit).toContainText("자동 발견 · 확인 필요");
-  await expect(credit).toContainText("7.5 %");
-  await expect(credit).toContainText("6.5 %");
+  await expect(credit).toContainText("7.5%");
+  await expect(credit).toContainText("6.5%");
   const student = results.locator(".finding").filter({
-    has: page.getByRole("heading", { name: /학자금대출 잔액.*15,000 원/ }),
+    has: page.getByRole("heading", { name: /학자금대출 잔액.*15,000원/ }),
   });
   await expect(student).toBeVisible();
-  await credit.getByText("판단 근거와 확인할 내용", { exact: true }).click();
+  await credit.getByText("판단 근거 보기", { exact: true }).click();
   await expect(credit).toContainText(basename(xlsx!));
   await expect(credit).toContainText(basename(docx!));
   await expect(credit).toContainText("기준일");
@@ -48,7 +50,8 @@ test("검사 시작만으로 차이를 발견하고 선택 검토 후에만 확�
   await credit.screenshot({ path: info.outputPath("automatic-credit.png") });
   await credit.getByRole("button", { name: "이 항목 검토" }).click();
   let detail = page.getByRole("region", { name: "선택 항목 상세 검토" });
-  await expect(detail).toContainText("같은 대상");
+  await expect(detail).toContainText("동일한 대출");
+  await detail.getByRole("button", { name: "고급 편집·개별 승인" }).click();
   await expect(detail.getByLabel("추천 숫자")).toHaveCount(2);
   await detail.getByRole("checkbox").check();
   await detail.getByRole("button", { name: "선택 값 확인·검증 승인" }).click();
@@ -60,6 +63,7 @@ test("검사 시작만으로 차이를 발견하고 선택 검토 후에만 확�
   await expect(results).toContainText("확정 오류 0");
   await credit.getByRole("button", { name: "확인 내용 수정" }).click();
   detail = page.getByRole("region", { name: "선택 항목 상세 검토" });
+  await detail.getByRole("button", { name: "고급 편집·개별 승인" }).click();
   for (const row of await detail.locator("tbody tr").all()) {
     await row.getByLabel("추천 기준일", { exact: true }).fill("2026-10-31");
     await row

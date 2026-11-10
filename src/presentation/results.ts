@@ -2,17 +2,13 @@ import type { Candidate } from "../normalization/types";
 import { fieldLabels } from "../normalization/types";
 import type { Result } from "../validation/types";
 import { loanIdentity } from "../recommendations/recommend";
-const number = (value: number, min = 0) =>
-  value.toLocaleString("ko-KR", {
-    minimumFractionDigits: min,
-    maximumFractionDigits:
-      value !== 0 && Math.abs(value) < 0.01 ? 12 : Math.max(min, 2),
-  });
+import { formatFinancial, formatRate } from "./format";
 /** 값은 변경하지 않고 사용자에게 표시할 단위와 자릿수만 정리한다. */
 export function displayValue(value: number | null, unit: string) {
-  return value === null
-    ? "—"
-    : `${number(value)}${unit === "%" || unit === "%p" ? "" : " "}${unit}`.trim();
+  return formatFinancial(value, unit, {
+    spaced: unit !== "%" && unit !== "%p",
+    difference: true,
+  });
 }
 function nameOf(c: Candidate | undefined) {
   if (!c) return "연결된 항목";
@@ -62,7 +58,7 @@ export function presentResult(r: Result) {
     return {
       headline:
         r.unit === "%"
-          ? `${subject(name)} ${number(Math.abs(r.difference ?? 0), 1)}%p 차이 납니다.`
+          ? `${subject(name)} ${formatRate(Math.abs(r.difference ?? 0), "%p", { difference: true })} 차이 납니다.`
           : `${subject(name)} 두 문서에서 다릅니다.`,
       description,
       nextAction:

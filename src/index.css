@@ -1018,3 +1018,213 @@ footer {
   color: #64748b;
   border-bottom: 1px solid #e1e6ed;
 }
+
+/* 검수 결과의 공통 간격과 좁은 화면 줄바꿈 */
+main {
+  max-width: 1440px;
+}
+.inspection-results {
+  border: 0;
+}
+.inspection-heading,
+.inspection-counts,
+.inspection-filters {
+  padding-inline: 24px;
+}
+.inspection-heading {
+  border-top: 1px solid #dce1e7;
+}
+.inspection-counts {
+  gap: 12px 24px;
+  font-variant-numeric: tabular-nums;
+}
+.inspection-counts strong {
+  color: #a7261e;
+}
+.finding-section > h2 {
+  padding: 18px 24px;
+  border-block: 1px solid #dce1e7;
+  font-size: 15px;
+  background: #f5f6f8;
+}
+.finding-section > h2 > span {
+  margin-left: 8px;
+  color: #526174;
+  font-size: 12px;
+  font-weight: 400;
+}
+.section-empty {
+  padding: 14px 24px;
+  font-size: 13px;
+  color: #526174;
+}
+.finding {
+  padding: 22px 24px;
+  min-width: 0;
+}
+.finding-heading {
+  align-items: flex-start;
+}
+.finding-heading h3 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+.finding-heading > span {
+  white-space: normal;
+}
+.finding-values {
+  margin: 10px 0;
+  gap: 12px 32px;
+  font-variant-numeric: tabular-nums;
+}
+.finding-values > p {
+  min-width: 0;
+}
+.finding-values span {
+  display: block;
+  color: #526174;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.finding-values strong {
+  display: block;
+  font-size: 17px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+.finding-description {
+  color: #334155;
+  font-size: 13px;
+  max-width: 960px;
+}
+.finding-comparison {
+  font-variant-numeric: tabular-nums;
+}
+.finding-proof {
+  padding-top: 4px;
+}
+.finding-evidence,
+.finding-proof p,
+.finding-proof li {
+  overflow-wrap: anywhere;
+}
+.related-findings {
+  border-bottom: 1px solid #dce1e7;
+}
+.related-findings > summary {
+  padding: 12px 24px;
+  font-size: 12px;
+  color: #334f70;
+  background: #f8f9fb;
+}
+.related-findings .finding {
+  margin-left: 24px;
+  border-left: 2px solid #e1e6ed;
+}
+.focused-review {
+  border-top: 1px solid #dce1e7;
+  padding: 16px 0 0;
+  margin-top: 16px;
+}
+.inline-review {
+  font-size: 13px;
+  color: #172b43;
+}
+.inline-review fieldset {
+  min-width: 0;
+}
+.inline-review legend {
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.inline-choice {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 10px 0;
+}
+.inline-choice input {
+  flex-shrink: 0;
+}
+.inline-conditions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 20px;
+  max-width: 850px;
+  margin: 16px 0;
+}
+.inline-conditions > p {
+  grid-column: 1/-1;
+  color: #526174;
+  overflow-wrap: anywhere;
+}
+.inline-conditions label {
+  display: block;
+  min-width: 0;
+}
+.inline-conditions input:not([type="checkbox"]),
+.inline-conditions select {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 3px;
+  padding: 7px 10px;
+  margin-top: 5px;
+  background: white;
+}
+.inline-certainty {
+  grid-column: 1/-1;
+}
+.inline-certainty input {
+  margin-right: 8px;
+}
+.inline-certainty small {
+  display: block;
+  margin: 5px 0 0 22px;
+  color: #526174;
+}
+.inline-issues {
+  margin: 12px 0;
+  color: #a7261e;
+}
+.finding-proof .pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+@media (max-width: 800px) {
+  main {
+    padding: 20px 16px;
+  }
+  .finding-heading {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .finding-values,
+  .inline-conditions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .finding,
+  .inspection-heading,
+  .inspection-counts,
+  .inspection-filters,
+  .finding-section > h2 {
+    padding-inline: 16px;
+  }
+  .related-findings .finding {
+    margin-left: 12px;
+  }
+  .finding-actions button {
+    max-width: 100%;
+    height: auto;
+    min-height: 36px;
+    white-space: normal;
+  }
+  .brand span {
+    display: none;
+  }
+  .steps {
+    flex-wrap: wrap;
+  }
+}

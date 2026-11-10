@@ -175,7 +175,7 @@ test.describe("제공된 실제 문서 시연", () => {
     await page.getByLabel("항목 검색").fill("유동성 자산 · 예금·적금");
     let row = page.locator(".review-table tbody tr");
     await expect(row).toHaveCount(1);
-    await expect(row).toContainText("590.0 만 원");
+    await expect(row).toContainText("590만 원");
     await row.getByText("상세 편집", { exact: true }).click();
     await row.getByLabel("기준일", { exact: true }).fill("2026-10-31");
     await row.getByLabel("시나리오", { exact: true }).fill("중복 배정 시연");

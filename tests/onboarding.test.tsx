@@ -22,9 +22,9 @@ import { newCalculation } from "../src/validation/types";
 afterEach(cleanup);
 it("금리 표시 잡음을 줄여도 원본 숫자와 작은 금리 값은 보존한다", () => {
   const c = item("r", "loanRate", 1.7000000000000002);
-  expect(candidateValue(c)).toBe("1.7 %");
+  expect(candidateValue(c)).toBe("1.7%");
   expect(c.number).toBe("1.7000000000000002");
-  expect(candidateValue({ ...c, number: "0.000001" })).toBe("0.000001 %");
+  expect(candidateValue({ ...c, number: "0.000001" })).toBe("0.000001%");
   expect(candidateValue({ ...c, number: "" })).toBe("값 미확인 %");
 });
 it("추천이 없는 계산 준비 항목은 실제 계산 구성 편집 위치를 연다", () => {

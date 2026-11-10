@@ -11,6 +11,8 @@ import { emptyPlanning } from "../planning/types";
 import type { Planning } from "../planning/types";
 import type { EvidenceRef } from "../validation/types";
 import { PlanningEditor } from "./PlanningEditor";
+import { candidateValue } from "../presentation/workflow";
+import { formatFinancial } from "../presentation/format";
 type Props = {
   calculationFocus?: { id: string; request: string };
   onPrepare?: (result: Result) => void;
@@ -112,7 +114,7 @@ export function ResultsView({
     }
   }, [selected]);
   const describe = (c: Candidate) =>
-    `${c.label} · ${c.number} ${c.unit} · ${c.source} ${c.location} · ${c.period || "기간 미확인"} · ${c.confirmed ? "확인됨" : "미확인"}`;
+    `${c.label} · ${candidateValue(c)} · ${c.source} ${c.location} · ${c.period || "기간 미확인"} · ${c.confirmed ? "확인됨" : "미확인"}`;
   function update(id: string, patch: Partial<Calculation>) {
     onChange(
       calculations.map((s) =>
@@ -251,7 +253,7 @@ export function ResultsView({
                         .filter((c) => c.source === source)
                         .map((c, i) => (
                           <p key={`${c.id}:${i}`}>
-                            {c.label}: {c.number} {c.unit}
+                            {c.label}: {candidateValue(c)}
                             <br />
                             {c.fileName} · {c.location}
                           </p>
@@ -388,7 +390,10 @@ export function ResultsView({
               <p className="pre">{c.originalText || "직접 입력"}</p>
               <p>
                 원본 숫자 {c.originalNumber ?? "없음"} · 현재 정규화 값{" "}
-                {c.normalizedValue ?? "미확인"}
+                {formatFinancial(
+                  c.normalizedValue,
+                  ["원", "만 원", "억 원"].includes(c.unit) ? "원" : c.unit,
+                )}
               </p>
             </article>
           ))}

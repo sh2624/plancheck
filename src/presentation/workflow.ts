@@ -1,14 +1,13 @@
 import type { Candidate } from "../normalization/types";
 import type { Recommendation } from "../recommendations/types";
 import { coreFields } from "../recommendations/types";
+import { displayNumber, formatFinancial } from "./format";
 /** 금리의 부동소수점 표시 잡음만 정리하고 원본 문자열과 편집 값은 그대로 둔다. */
 export function candidateValue(c: Candidate) {
-  const n = Number(c.number);
-  const value =
-    c.unit === "%" && c.number.trim() && Number.isFinite(n)
-      ? n.toLocaleString("ko-KR", { maximumSignificantDigits: 15 })
-      : c.number;
-  return `${value || "값 미확인"} ${c.unit}`;
+  const value = displayNumber(c.number);
+  return value === null
+    ? `값 미확인 ${c.unit}`
+    : formatFinancial(value, c.unit);
 }
 /** 핵심 추천에 필요한 후보를 우선하고 실제 수동 입력 항목도 확인 대상에 남긴다. */
 export function coreCandidates(

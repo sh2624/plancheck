@@ -36,6 +36,14 @@ import { validatePlanning } from "./planning/engine";
 import { presentResult } from "./presentation/results";
 import { inspectDocuments } from "./inspection/analyze";
 import { InspectionResults } from "./components/InspectionResults";
+import {
+  applyInlineReview,
+  reviewFingerprint,
+  removeDecisions,
+  type ReviewDecision,
+  type ReviewChoice,
+  type InlineAnswers,
+} from "./inspection/review";
 /** 원본 추출과 사용자 확인 상태를 관리하며 파일 교체 시 관련 연결을 해제한다. */
 export default function App() {
   const revision = useRef(0);
@@ -48,6 +56,9 @@ export default function App() {
   const [registered, setRegistered] = useState({ XLSX: false, DOCX: false });
   const [inspectionStarted, setInspectionStarted] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [inlineDecisions, setInlineDecisions] = useState<
+    Record<string, ReviewDecision>
+  >({});
   const [focusIds, setFocusIds] = useState<string[]>([]);
   const [planning, setPlanning] = useState(emptyPlanning);
   const [sourceReferences, setSourceReferences] = useState<EvidenceRef[]>([]);
@@ -88,9 +99,27 @@ export default function App() {
             calculations,
             planning,
             references: sourceReferences,
+          }).map((f) => {
+            const decision = inlineDecisions[f.id];
+            return {
+              ...f,
+              decision:
+                decision &&
+                decision.fingerprint ===
+                  reviewFingerprint(review.items, decision.candidateIds)
+                  ? decision
+                  : undefined,
+            };
           })
         : [],
-    [inspectionStarted, review, calculations, planning, sourceReferences],
+    [
+      inspectionStarted,
+      review,
+      calculations,
+      planning,
+      sourceReferences,
+      inlineDecisions,
+    ],
   );
   const progress = reviewProgress(review.items, coreIds);
   const results = useMemo(
@@ -203,6 +232,7 @@ export default function App() {
   }
   function apply(r: Recommendation, approve: boolean) {
     revision.current++;
+    setInlineDecisions((prev) => removeDecisions(prev, r.candidateIds));
     const next = applyRecommendation({ ...review, calculations }, r, approve);
     setReview({ items: next.items, links: next.links });
     setCalculations(next.calculations);
@@ -284,6 +314,7 @@ export default function App() {
   ) {
     revision.current++;
     setInspectionStarted(false);
+    setInlineDecisions({});
     setDocuments((prev) => {
       const nextDocs = { ...prev };
       if (fingerprint !== undefined || next.length || references.length)
@@ -324,6 +355,7 @@ export default function App() {
   }
   function edit(id: string, patch: Partial<Candidate>) {
     revision.current++;
+    setInlineDecisions((prev) => removeDecisions(prev, [id]));
     setPlanning((prev) => ({
       ...prev,
       allocations: prev.allocations.map((r) =>
@@ -378,6 +410,7 @@ export default function App() {
   }
   function link(a: string, b: string) {
     revision.current++;
+    setInlineDecisions((prev) => removeDecisions(prev, [a, b]));
     setReview((prev) => {
       const x = prev.items.find(
           (c) => c.id === a && !c.excluded && c.source === "XLSX",
@@ -398,6 +431,11 @@ export default function App() {
   }
   function unlink(id: string) {
     revision.current++;
+    const pair = review.links.find((l) => l.id === id);
+    if (pair)
+      setInlineDecisions((prev) =>
+        removeDecisions(prev, [pair.xlsxId, pair.docxId]),
+      );
     setReview((prev) => ({
       ...prev,
       links: prev.links.filter((l) => l.id !== id),
@@ -411,6 +449,53 @@ export default function App() {
         c.id === id && canConfirm(c) ? { ...c, confirmed: true } : c,
       ),
     }));
+  }
+  /** 원본을 임의 확정하지 않고 명시적 답변으로 기존 승인 상태를 갱신한다. */
+  function inlineReview(
+    r: Recommendation,
+    choice: ReviewChoice,
+    answers: InlineAnswers,
+  ) {
+    const outcome = applyInlineReview(
+      { ...review, calculations },
+      r,
+      choice,
+      answers,
+    );
+    if (!outcome.ok) return outcome.issues;
+    revision.current++;
+    setReview({ items: outcome.state.items, links: outcome.state.links });
+    setCalculations(outcome.state.calculations);
+    setInlineDecisions((prev) => ({
+      ...removeDecisions(prev, outcome.changedIds),
+      [r.id]: outcome.decision,
+    }));
+    if (outcome.changedIds.length)
+      setPlanning((prev) => ({
+        ...prev,
+        allocations: prev.allocations.map((row) =>
+          outcome.changedIds.some(
+            (id) =>
+              row.assetId === id ||
+              row.goalId === id ||
+              row.candidateIds.includes(id),
+          )
+            ? { ...row, confirmed: false }
+            : row,
+        ),
+        funds: prev.funds.map((row) =>
+          row.candidateIds.some((id) => outcome.changedIds.includes(id))
+            ? { ...row, confirmed: false }
+            : row,
+        ),
+        actions: prev.actions.map((row) =>
+          row.candidateIds.some((id) => outcome.changedIds.includes(id))
+            ? { ...row, confirmed: false }
+            : row,
+        ),
+      }));
+    setApprovalVersion((v) => v + 1);
+    return [];
   }
   return (
     <>
@@ -599,6 +684,7 @@ export default function App() {
         {step === "results" && (
           <>
             <InspectionResults
+              onInlineReview={inlineReview}
               onPrepare={prepare}
               started={inspectionStarted}
               findings={findings}
@@ -645,6 +731,7 @@ export default function App() {
                     documents={documents}
                     onRestore={(next) => {
                       revision.current++;
+                      setInlineDecisions({});
                       setReview(next);
                       setCalculations((prev) =>
                         prev.map((c) => ({ ...c, scopeConfirmed: false })),

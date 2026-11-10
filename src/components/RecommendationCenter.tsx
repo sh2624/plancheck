@@ -6,6 +6,7 @@ import type { Calculation } from "../validation/types";
 import { rules } from "../validation/types";
 import type { Recommendation } from "../recommendations/types";
 import { Button } from "./ui/button";
+import { formatFinancial } from "../presentation/format";
 type Props = {
   focus?: { id: string; kind: string };
   recommendations: Recommendation[];
@@ -275,7 +276,12 @@ export function RecommendationDetail({
                       정규화:{" "}
                       {c.normalizedValue === null
                         ? "확인 필요"
-                        : c.normalizedValue.toLocaleString("ko-KR")}
+                        : formatFinancial(
+                            c.normalizedValue,
+                            ["원", "만 원", "억 원"].includes(c.unit)
+                              ? "원"
+                              : c.unit,
+                          )}
                     </p>
                   </td>
                   <td>

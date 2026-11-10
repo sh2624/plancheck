@@ -5,6 +5,7 @@ import type { Candidate, Link, Field, Unit } from "../normalization/types";
 import { canConfirm } from "../normalization/values";
 import { suggestLinks } from "../normalization/links";
 import { candidateValue } from "../presentation/workflow";
+import { formatFinancial } from "../presentation/format";
 type Props = {
   coreIds?: string[];
   reasons?: { ids: string[]; reason: string; title: string }[];
@@ -75,7 +76,7 @@ export function ReviewView({
   const find = (id: string) => items.find((c) => c.id === id);
   const describe = (c: Candidate | undefined) =>
     c
-      ? `${c.label} · ${c.number || "값 없음"} ${c.unit} · ${c.location} · ${c.asOf || "기준일 미확인"} · ${c.period || "기간 미확인"} · ${c.scenario || "시나리오 미확인"}`
+      ? `${c.label} · ${candidateValue(c)} · ${c.location} · ${c.asOf || "기준일 미확인"} · ${c.period || "기간 미확인"} · ${c.scenario || "시나리오 미확인"}`
       : "삭제된 항목";
   return (
     <section
@@ -305,7 +306,13 @@ export function ReviewView({
                         정규화:{" "}
                         {c.normalizedValue === null
                           ? "확인 필요"
-                          : `${c.normalizedValue.toLocaleString("ko-KR", { maximumFractionDigits: 10 })} ${["원", "만 원", "억 원"].includes(c.unit) ? "원" : c.unit}`}
+                          : formatFinancial(
+                              c.normalizedValue,
+                              ["원", "만 원", "억 원"].includes(c.unit)
+                                ? "원"
+                                : c.unit,
+                              { spaced: true },
+                            )}
                       </p>
                     </div>
                   </details>

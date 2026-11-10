@@ -11,6 +11,42 @@ import { emptyPlanning, newRecord } from "../src/planning/types";
 import { inspectDocuments } from "../src/inspection/analyze";
 import { extractPlanning } from "../src/planning/extract";
 const link = [{ id: "pair", xlsxId: "x", docxId: "d" }];
+it("동일 제안에 여러 실행 근거가 있어도 결과별 고유 ID와 근거를 유지한다", () => {
+  const actions = (
+    [
+      ["a", "제안", "중단"],
+      ["b", "실행", "유지"],
+      ["c", "실행", "시작"],
+    ] as const
+  ).map(([id, side, action]) => ({
+    ...newRecord("action", id),
+    label: `계획 ${id}`,
+    targetId: "펀드 적립",
+    side,
+    action,
+    start: "2026-11-01",
+    end: "2026-12-01",
+    scenario: "기본안",
+    references: [
+      {
+        source: "DOCX" as const,
+        fileName: "plan.docx",
+        location: `문단 ${id}`,
+        originalText: `원본 계획 ${id}`,
+      },
+    ],
+  }));
+  const findings = inspectDocuments({
+    items: [],
+    links: [],
+    calculations: [],
+    planning: { ...emptyPlanning(), actions },
+    references: [],
+  });
+  expect(findings).toHaveLength(2);
+  expect(new Set(findings.map((f) => f.id)).size).toBe(2);
+  expect(findings.every((f) => f.result.references?.length === 2)).toBe(true);
+});
 it("단순 지원금 예시가 잘못 추천돼도 선반영 오류로 단정하지 않고 제외할 수 있다", () => {
   const ref = {
     source: "DOCX" as const,
