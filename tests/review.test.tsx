@@ -172,7 +172,8 @@ it('확인한 승인 연결만 결과에 표시하고 편집 후 오래된 판�
   fireEvent.click(screen.getByRole('button', { name: '관련 항목 확인·수정' }));
   expect((screen.getByLabelText('목록 필터') as HTMLSelectElement).value).toBe('관련 항목');
   expect(screen.getAllByLabelText('숫자')).toHaveLength(2);
-  fireEvent.change(screen.getAllByLabelText('숫자')[0], {
+  const excelNumber = screen.getAllByLabelText('숫자').find((input) => input.closest('tr')?.textContent?.includes('XLSX'))!;
+  fireEvent.change(excelNumber, {
     target: { value: '320' },
   });
   openAdvancedResults();
