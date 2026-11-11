@@ -227,7 +227,7 @@ export function RecommendationDetail({
                       </select>
                     </label>
                     <p>
-                      정규화:{' '}
+                      단위를 맞춘 금액:{' '}
                       {c.normalizedValue === null
                         ? '확인 필요'
                         : formatFinancial(c.normalizedValue, ['원', '만 원', '억 원'].includes(c.unit) ? '원' : c.unit)}
@@ -306,7 +306,7 @@ export function RecommendationDetail({
       <div className="steps">
         {members.length > 0 && (
           <Button variant="outline" onClick={() => onInspect(r.candidateIds)}>
-            해당 데이터 확인 화면으로 이동
+            문서 내용 확인·수정
           </Button>
         )}
         {(r.kind === 'PLAN' || r.kind === 'ALLOC') && (

@@ -224,7 +224,7 @@ export function ReviewView({ coreIds, reasons = [], items, links, onEdit, onConf
                         </>
                       )}
                       <p>
-                        정규화:{' '}
+                        단위를 맞춘 금액:{' '}
                         {c.normalizedValue === null
                           ? '확인 필요'
                           : formatFinancial(c.normalizedValue, ['원', '만 원', '억 원'].includes(c.unit) ? '원' : c.unit, { spaced: true })}

@@ -306,7 +306,7 @@ export function ResultsView({
             </article>
           ))}
           <Button disabled={!detail.evidence.length} variant="outline" onClick={() => onInspect(detail.evidence.map((c) => c.id))}>
-            관련 항목 확인·수정
+            문서 내용 확인·수정
           </Button>
         </section>
       )}

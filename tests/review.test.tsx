@@ -84,7 +84,7 @@ it('실제 정규화 경로로 숫자·단위·시점·확정 여부를 수정�
   fireEvent.change(within(row).getByLabelText('단위'), {
     target: { value: '만 원' },
   });
-  expect(within(row).getByText('정규화: 3,160,000 원')).toBeTruthy();
+  expect(within(row).getByText('단위를 맞춘 금액: 3,160,000 원')).toBeTruthy();
   fireEvent.change(within(row).getByLabelText('기준일'), {
     target: { value: '2026-11' },
   });
@@ -97,7 +97,7 @@ it('실제 정규화 경로로 숫자·단위·시점·확정 여부를 수정�
   expect(within(region).getByRole('heading', { name: '승인한 연결 1개' })).toBeTruthy();
   fireEvent.change(number, { target: { value: '' } });
   expect(within(row).getByText('확인 필요')).toBeTruthy();
-  expect(within(row).getByText('정규화: 확인 필요')).toBeTruthy();
+  expect(within(row).getByText('단위를 맞춘 금액: 확인 필요')).toBeTruthy();
   expect(within(region).getByRole('heading', { name: '승인한 연결 0개' })).toBeTruthy();
   expect(
     (
@@ -169,7 +169,7 @@ it('확인한 승인 연결만 결과에 표시하고 편집 후 오래된 판�
   openAdvancedResults();
   expect(screen.getByText('오류', { exact: true, selector: 'span' })).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: /CROSS_VALUE/ }));
-  fireEvent.click(screen.getByRole('button', { name: '관련 항목 확인·수정' }));
+  fireEvent.click(screen.getByRole('button', { name: '문서 내용 확인·수정' }));
   expect((screen.getByLabelText('목록 필터') as HTMLSelectElement).value).toBe('관련 항목');
   expect(screen.getAllByLabelText('숫자')).toHaveLength(2);
   const excelNumber = screen.getAllByLabelText('숫자').find((input) => input.closest('tr')?.textContent?.includes('XLSX'))!;

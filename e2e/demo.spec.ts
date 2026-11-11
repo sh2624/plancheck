@@ -70,7 +70,7 @@ test.describe('제공된 실제 문서 시연', () => {
     let detail = page.getByRole('region', { name: '검증 근거 상세' });
     await expect(detail).toContainText('확인 필요');
     await expect(detail).toContainText('1 %p');
-    await detail.getByRole('button', { name: '관련 항목 확인·수정' }).click();
+    await detail.getByRole('button', { name: '문서 내용 확인·수정' }).click();
     const review = page.getByRole('region', { name: '데이터 확인' });
     const rows = review.locator('.review-table tbody tr');
     await expect(rows).toHaveCount(2);

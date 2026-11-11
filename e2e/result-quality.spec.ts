@@ -18,7 +18,7 @@ test('전체 기록을 유지하며 핵심 독립 발견·재무 항목 필터·
     total = Number((await panel.locator('.analysis-count').textContent())!.match(/전체 (\d+)개/)![1]);
   expect(priorityCount).toBeGreaterThan(0);
   expect(total).toBeGreaterThan(priorityCount);
-  await expect(panel).toContainText('확정 오류 0');
+  await expect(panel).toContainText('확인된 오류 0');
   await expect(page.locator('.quality-extra')).not.toHaveAttribute('open', '');
   await expect(page.locator('.quality-records')).not.toHaveAttribute('open', '');
   for (const title of await priority.locator('.finding-heading').allTextContents()) expect(title).not.toMatch(/CALC_|CROSS_|ALLOC_|PLAN_/);
@@ -35,7 +35,7 @@ test('전체 기록을 유지하며 핵심 독립 발견·재무 항목 필터·
     .getByRole('region', { name: '상세 분석 기록', exact: true })
     .locator('.finding')
     .filter({
-      has: page.getByRole('button', { name: '원본 항목 확인', exact: true }),
+      has: page.getByRole('button', { name: '문서 내용 확인·수정', exact: true }),
     })
     .first();
   await expect(
@@ -62,7 +62,7 @@ test('전체 기록을 유지하며 핵심 독립 발견·재무 항목 필터·
   await expect(context.locator('.finding-comparison')).toHaveCount(0);
   await context.getByText('판단 근거 보기', { exact: true }).click();
   await expect(context).toContainText('적용 기간');
-  await expect(panel).toContainText('확정 오류 0');
+  await expect(panel).toContainText('확인된 오류 0');
   await page.getByLabel('재무 항목', { exact: true }).selectOption('전체');
   await expect(panel.locator('.analysis-count')).toContainText(`전체 ${total}개`);
   await page.setViewportSize({ width: 390, height: 844 });

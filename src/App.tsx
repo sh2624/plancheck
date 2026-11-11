@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef } from 'react';
-import { FileCheck2, LockKeyhole } from 'lucide-react';
+import { FileCheck2 } from 'lucide-react';
 import { DocumentPanel } from './components/DocumentPanel';
 import { WorkbookView } from './components/WorkbookView';
 import { WordView } from './components/WordView';
@@ -400,10 +400,6 @@ export default function App() {
           <strong>PlanCheck</strong>
           <span>문서 검수 작업 공간</span>
         </div>
-        <span className="privacy">
-          <LockKeyhole size={14} aria-hidden />
-          브라우저 내 처리
-        </span>
       </header>
       <main>
         <div className="intro">
@@ -454,10 +450,7 @@ export default function App() {
             <Button onClick={next.run}>{next.label}</Button>
           </aside>
         </details>
-        <div className="scope">
-          XLSX·DOCX는 브라우저 안에서 처리하며 외부로 전송하지 않습니다.
-          {step === 'results' && ' 발견 후보는 같은 대상과 조건인지 확인한 뒤 오류로 판정합니다.'}
-        </div>
+        {step === 'raw' && <p className="scope">선택한 문서는 브라우저 안에서만 처리하며 외부로 전송하지 않습니다.</p>}
         <div className="workspace" hidden={step !== 'raw'}>
           <DocumentPanel
             compact

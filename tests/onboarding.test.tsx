@@ -120,7 +120,7 @@ it('판정 결과와 준비 중 항목을 분리해도 기존 엔진 결과와 �
   fireEvent.click(screen.getByRole('button', { name: '필요한 항목 확인' }));
   expect(prepare).toHaveBeenCalledWith(expect.objectContaining({ code: 'CALC_NET' }));
   fireEvent.click(screen.getByRole('button', { name: /CALC_ASSETS/ }));
-  fireEvent.click(screen.getByRole('button', { name: '관련 항목 확인·수정' }));
+  fireEvent.click(screen.getByRole('button', { name: '문서 내용 확인·수정' }));
   expect(inspect).toHaveBeenCalledWith(['t', 'a']);
   expect(JSON.stringify(validateAll(items, [], specs))).toBe(before);
 });

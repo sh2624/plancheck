@@ -18,6 +18,12 @@ const kinds = {
   ALLOC: '자금 배정',
   PLAN: '조건부 금액·계획',
 };
+const statusLabels: Record<Result['status'], string> = {
+  오류: '확인된 오류',
+  '확인 필요': '비교 기준 확인됨 · 확인 필요',
+  '검증 통과': '검사 통과',
+  '검증 불가': '아직 검사할 수 없음',
+};
 type Props = InspectionInput & {
   findings: ReviewedFinding[];
   started: boolean;
@@ -39,7 +45,7 @@ function explanation(f: ReviewedFinding) {
   if ((f.approved ?? f.result).status === '검증 불가') return '검사에 필요한 값이나 관계가 부족합니다. 근거에서 누락 조건을 확인하세요.';
   return f.kind === 'CROSS'
     ? f.signal === '수치 차이'
-      ? '두 문서에 다른 수치가 있습니다. 동일한 대상과 기준의 값인지 확인해 주세요.'
+      ? '두 값의 대상과 비교 기준이 같은지 확인해 주세요.'
       : '숫자만으로 동일 항목을 확정하지 않습니다. 관계와 적용 기준을 확인해 주세요.'
     : '추천된 구성과 원문 조건을 바탕으로 한 후보입니다. 필요한 범위와 조건을 확인해 주세요.';
 }
@@ -83,14 +89,14 @@ export function InspectionResults(props: Props) {
       entry = qualityMap.get(f.id)!;
     const status =
       f.decision?.choice === 'different'
-        ? '다른 조건 · 보류'
+        ? '비교 기준 다름 · 추가 정보 필요'
         : f.decision?.choice === 'unknown'
-          ? '확인 불가 · 보류'
+          ? '비교 기준 확인 필요'
           : f.approved
-            ? `사용자 확인 후 · ${f.approved.status}`
+            ? statusLabels[f.approved.status]
             : section === resultSections[3]
-              ? '정보 부족 · 보류'
-              : '자동 발견 · 확인 필요';
+              ? '추가 정보 필요'
+              : '검사 중 발견 · 확인 필요';
     return (
       <article className="finding" data-finding={f.id} data-tier={entry.tier} key={f.id} tabIndex={-1}>
         <div className="finding-heading">
@@ -154,7 +160,7 @@ export function InspectionResults(props: Props) {
               } else props.onPrepare(r);
             }}
           >
-            {f.relationship?.blocked ? '원본 항목 확인' : f.approved ? '확인 내용 수정' : '이 항목 검토'}
+            {f.relationship?.blocked ? '문서 내용 확인·수정' : f.approved ? '확인 내용 수정' : '이 항목 검토'}
           </Button>
         </div>
         {selected === f.id && f.recommendation && (
@@ -236,7 +242,7 @@ export function InspectionResults(props: Props) {
           <small>검증 규칙 {r.code}</small>
           <div className="finding-actions">
             <Button variant="outline" disabled={!r.evidence.length} onClick={() => onInspect(r.evidence.map((c) => c.id))}>
-              관련 원본·데이터 수정
+              문서 내용 확인·수정
             </Button>
           </div>
         </details>
@@ -274,7 +280,7 @@ export function InspectionResults(props: Props) {
         <span>필요한 항목만 확인하세요</span>
       </div>
       <div className="inspection-counts">
-        <strong>확정 오류 {quality.filter((e) => e.finding.approved?.status === '오류').length}</strong>
+        <strong>확인된 오류 {quality.filter((e) => e.finding.approved?.status === '오류').length}</strong>
         <span>우선 확인할 문제 {quality.filter((e) => e.tier === qualityTiers[0]).length}개</span>
       </div>
       <div className="inspection-filters">

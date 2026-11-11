@@ -13,7 +13,7 @@ export function DocumentSummary({ data, items }: { data: Workbook | WordDocument
     <div className="document-summary">
       <p className="source">원본: {data.fileName}</p>
       <p>
-        {structure} · 재무 항목 후보 {items.length}개
+        {structure} · 문서에서 찾은 재무 정보 {items.length}개
       </p>
       <h3>주요 재무 항목</h3>
       {major.length ? (

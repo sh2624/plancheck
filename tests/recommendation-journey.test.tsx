@@ -60,7 +60,7 @@ it.skipIf(!process.env.PLANCHECK_XLSX || !process.env.PLANCHECK_DOCX)(
     expect(detail.textContent).toContain('financial.xlsx');
     expect(detail.textContent).toContain('report.docx');
     expect(within(detail).getAllByText(/원본 숫자/)).toHaveLength(2);
-    fireEvent.click(within(detail).getByRole('button', { name: '관련 항목 확인·수정' }));
+    fireEvent.click(within(detail).getByRole('button', { name: '문서 내용 확인·수정' }));
     const data = screen.getByRole('region', { name: '데이터 확인' });
     expect(within(data).getAllByLabelText('숫자')).toHaveLength(2);
     expect(data.textContent).toContain('확인 완료 2개');

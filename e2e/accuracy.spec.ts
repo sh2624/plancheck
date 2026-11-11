@@ -32,7 +32,7 @@ test('주입한 총자산 차이는 3회 확인으로 확정되고 동일 관계
     .filter({ hasText: accuracySheet })
     .first();
   await expect(card).toBeVisible();
-  await expect(card).not.toContainText('사용자 확인 후 · 오류');
+  await expect(card).not.toContainText('확인된 오류');
   let actions = 0;
   await card.getByRole('button', { name: '이 항목 검토', exact: true }).click();
   actions++;
@@ -43,7 +43,7 @@ test('주입한 총자산 차이는 3회 확인으로 확정되고 동일 관계
   await inline.getByRole('button', { name: '확인 내용 적용' }).click();
   actions++;
   expect(actions).toBe(3);
-  const confirmed = panel.locator('.finding').filter({ hasText: '사용자 확인 후 · 오류' }).filter({ hasText: '200,000원' }).first();
+  const confirmed = panel.locator('.finding').filter({ hasText: '확인된 오류' }).filter({ hasText: '200,000원' }).first();
   await expect(confirmed).toContainText('총자산');
   await confirmed.getByText('판단 근거 보기', { exact: true }).click();
   await expect(confirmed).toContainText(accuracySheet);
@@ -82,7 +82,7 @@ for (const kind of ['CALC', 'FUND', 'ACTION', 'ALLOC'] as const) {
       operations++;
     };
     const panel = page.getByRole('region', { name: '자동 검사 결과' });
-    await expect(panel).toContainText('확정 오류 0');
+    await expect(panel).toContainText('확인된 오류 0');
     if (kind === 'CALC') {
       const card = panel.locator('.quality-priority .finding').filter({ hasText: '20,000원' }).filter({ hasText: accuracySheet }).first();
       await act(card.getByRole('button', { name: '이 항목 검토', exact: true }).click());
@@ -154,7 +154,7 @@ for (const kind of ['CALC', 'FUND', 'ACTION', 'ALLOC'] as const) {
         }
       }
     }
-    const error = panel.locator('.quality-priority .finding').filter({ hasText: '사용자 확인 후 · 오류' }).first();
+    const error = panel.locator('.quality-priority .finding').filter({ hasText: '확인된 오류' }).first();
     await expect(error).toBeVisible();
     if (kind === 'CALC') await expect(error).toContainText('20,000원');
     if (kind === 'ALLOC') await expect(error).toContainText('3,000,000원');

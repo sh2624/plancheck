@@ -38,7 +38,6 @@ header {
   gap: 16px;
 }
 .brand,
-.privacy,
 h2 {
   display: flex;
   align-items: center;
@@ -47,8 +46,7 @@ h2 {
 .brand strong {
   font-size: 21px;
 }
-.brand span,
-.privacy {
+.brand span {
   color: #657386;
   font-size: 13px;
 }
@@ -75,9 +73,8 @@ h3 {
 }
 .scope {
   color: #526174;
-  border-block: 1px solid #dce1e7;
-  padding: 10px 0;
-  margin: 20px 0;
+  padding: 0;
+  margin: 24px 0 16px;
   font-size: 13px;
 }
 .workspace {
@@ -1310,5 +1307,205 @@ main {
   .quality-records > summary > span {
     display: block;
     margin: 4px 0 0;
+  }
+}
+
+/* 베타 화면의 공통 글자 크기와 작업 간격. 금액과 상태 의미는 유지한다. */
+
+:root {
+  font-size: 15px;
+  line-height: 1.6;
+}
+header {
+  padding: 16px 24px;
+}
+main {
+  max-width: 1440px;
+  padding: 24px;
+}
+h1 {
+  font-size: 24px;
+  line-height: 1.5;
+}
+h2,
+.panel-heading h2,
+.finding-section > h2,
+.quality-extra > summary,
+.quality-records > summary {
+  font-size: 18px;
+  line-height: 1.5;
+}
+.intro {
+  margin-bottom: 16px;
+}
+nav.steps + .muted {
+  margin-top: 12px;
+}
+.intro > p:last-child {
+  font-size: 15px;
+  color: #526174;
+}
+:root :is(button, select, textarea, input:not([type='file'])) {
+  font-size: 14px;
+  line-height: 1.5;
+}
+:root button {
+  min-height: 40px;
+  height: auto;
+  padding-block: 8px;
+  white-space: normal;
+}
+input::file-selector-button {
+  font-size: 14px;
+  min-height: 40px;
+}
+:root :is(select, textarea, input:not([type='file'], [type='checkbox'], [type='radio'])) {
+  min-height: 38px;
+  max-width: 100%;
+}
+input[type='checkbox'],
+input[type='radio'] {
+  accent-color: #183553;
+}
+small,
+.muted,
+.source,
+.file-line,
+.quality-caption,
+.finding-values span,
+.inspection-heading > span {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #526174;
+}
+.upload label,
+.empty,
+.notice,
+.warning,
+.inline-review {
+  font-size: 14px;
+  line-height: 1.6;
+}
+.empty {
+  color: #526174;
+  padding: 24px 20px;
+}
+.panel-heading,
+.upload {
+  padding: 16px 20px;
+}
+.workspace {
+  gap: 24px;
+}
+.inspection-start {
+  margin: 24px 0;
+  gap: 16px;
+  padding: 20px;
+}
+.inspection-results {
+  margin-top: 24px;
+}
+.inspection-heading {
+  padding: 16px 24px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.inspection-counts,
+.inspection-filters {
+  padding: 12px 24px;
+  gap: 12px 24px;
+}
+.inspection-filters {
+  align-items: flex-start;
+}
+.finding-section > h2 {
+  padding: 16px 24px;
+  border-top: 0;
+}
+.quality-caption {
+  padding: 8px 24px;
+}
+.quality-extra,
+.quality-records {
+  margin-top: 24px;
+}
+.quality-extra > summary,
+.quality-records > summary {
+  padding: 16px 24px;
+}
+.finding {
+  padding: 20px 24px;
+}
+.finding-description,
+.quality-priority .finding-description {
+  font-size: 15px;
+  line-height: 1.6;
+}
+.finding-values strong {
+  font-size: 21px;
+}
+.finding-comparison {
+  font-size: 14px;
+}
+.finding-values,
+.finding-comparison,
+.review-table,
+.planning-grid input {
+  font-variant-numeric: tabular-nums;
+}
+.finding-actions {
+  gap: 12px;
+  margin-top: 12px;
+}
+.file-line > span {
+  min-width: 0;
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.file-line > button {
+  flex-shrink: 0;
+}
+:is(.source, .document-summary, .pre, .intro, .finding-proof) {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+@media (max-width: 800px) {
+  header {
+    padding: 16px;
+  }
+  main {
+    padding: 24px 16px;
+  }
+  h1 {
+    font-size: 22px;
+  }
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+  .inspection-heading,
+  .inspection-counts,
+  .inspection-filters,
+  .finding-section > h2,
+  .quality-caption,
+  .quality-extra > summary,
+  .quality-records > summary,
+  .finding {
+    padding-inline: 16px;
+  }
+  .inspection-start {
+    flex-wrap: wrap;
+  }
+  .inspection-filters > label,
+  .quality-filter-options {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .finding-heading {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .steps {
+    gap: 8px;
   }
 }

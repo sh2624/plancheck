@@ -1,4 +1,4 @@
-﻿import { afterEach, it, expect, vi } from 'vitest';
+import { afterEach, it, expect, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { useState } from 'react';
 import { ResultsView } from '../src/components/ResultsView';
@@ -23,7 +23,7 @@ it('계산 오류를 선택해 원문과 위치를 확인하고 관련 항목으
   const detail = screen.getByRole('region', { name: '검증 근거 상세' });
   expect(within(detail).getByText('원본 a 40')).toBeTruthy();
   expect(within(detail).getAllByText(/test.xlsx · 기준일/)).toHaveLength(3);
-  fireEvent.click(within(detail).getByRole('button', { name: '관련 항목 확인·수정' }));
+  fireEvent.click(within(detail).getByRole('button', { name: '문서 내용 확인·수정' }));
   expect(onInspect).toHaveBeenCalledWith(['t', 'a', 'b']);
   fireEvent.change(screen.getByLabelText('허용오차 (원)'), {
     target: { value: '10' },

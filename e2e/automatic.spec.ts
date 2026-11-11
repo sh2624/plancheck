@@ -24,12 +24,12 @@ test('검사 시작만으로 차이를 발견하고 선택 검토 후에만 확�
   await expect(page.getByLabel('숫자', { exact: true })).toHaveCount(0);
   await start.click();
   const results = page.getByRole('region', { name: '자동 검사 결과' });
-  await expect(results).toContainText('확정 오류 0');
+  await expect(results).toContainText('확인된 오류 0');
   let credit = results.locator('.finding').filter({
     has: page.getByRole('heading', { name: /신용대출 금리.*1.0%p/ }),
   });
   await expect(credit).toHaveCount(1);
-  await expect(credit).toContainText('자동 발견 · 확인 필요');
+  await expect(credit).toContainText('검사 중 발견 · 확인 필요');
   await expect(credit).toContainText('7.5%');
   await expect(credit).toContainText('6.5%');
   const student = results.locator('.finding').filter({
@@ -53,8 +53,8 @@ test('검사 시작만으로 차이를 발견하고 선택 검토 후에만 확�
     .locator('.finding')
     .filter({ has: page.getByRole('heading', { name: /신용대출 금리/ }) })
     .first();
-  await expect(credit).toContainText('사용자 확인 후 · 확인 필요');
-  await expect(results).toContainText('확정 오류 0');
+  await expect(credit).toContainText('비교 기준 확인됨 · 확인 필요');
+  await expect(results).toContainText('확인된 오류 0');
   await credit.getByRole('button', { name: '확인 내용 수정' }).click();
   detail = page.getByRole('region', { name: '선택 항목 상세 검토' });
   await detail.getByRole('button', { name: '고급 편집·개별 승인' }).click();
@@ -65,14 +65,14 @@ test('검사 시작만으로 차이를 발견하고 선택 검토 후에만 확�
   }
   await detail.getByRole('checkbox').check();
   await detail.getByRole('button', { name: '선택 값 확인·검증 승인' }).click();
-  await expect(results).toContainText('확정 오류 1');
+  await expect(results).toContainText('확인된 오류 1');
   const final = results.locator('.finding').filter({
     has: page.getByRole('heading', {
       name: '신용대출 금리가 1.0%p 차이 납니다.',
       exact: true,
     }),
   });
-  await expect(final).toContainText('사용자 확인 후 · 오류');
+  await expect(final).toContainText('확인된 오류');
   await final.screenshot({ path: info.outputPath('confirmed-credit.png') });
   await page.getByRole('button', { name: '1. 검사 시작' }).click();
   await page.getByLabel(/검토할 Excel/).setInputFiles(xlsx!);
