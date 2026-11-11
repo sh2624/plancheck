@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { Finding } from '../inspection/analyze';
 import type { Candidate } from '../normalization/types';
 import { units } from '../normalization/types';
-import { inlineRequirements, type ReviewChoice, type InlineAnswers } from '../inspection/review';
+import { inlineRequirements, previouslyApprovedPair, type ReviewChoice, type InlineAnswers } from '../inspection/review';
 import { Button } from './ui/button';
 type Props = {
   finding: Finding;
@@ -15,7 +15,8 @@ type Props = {
 export function InlineReview({ finding, items, onApply, onComplex, onClose }: Props) {
   const members = finding.recommendation?.candidateIds.map((id) => items.find((c) => c.id === id)).filter((c): c is Candidate => !!c) ?? [];
   const need = inlineRequirements(members);
-  const [choice, setChoice] = useState<ReviewChoice | ''>(''),
+  const reused = previouslyApprovedPair(finding, items);
+  const [choice, setChoice] = useState<ReviewChoice | ''>(() => (reused ? 'same' : '')),
     [answers, setAnswers] = useState<InlineAnswers>({}),
     [issues, setIssues] = useState<string[]>([]);
   const patch = (next: Partial<InlineAnswers>) => {
@@ -27,6 +28,7 @@ export function InlineReview({ finding, items, onApply, onComplex, onClose }: Pr
     : '두 값은 동일한 항목과 같은 기준일·시나리오를 나타내나요?';
   return (
     <div className="inline-review">
+      {reused && <p className="review-reused">이 원본 연결은 이미 승인했습니다. 변경할 조건만 확인하세요.</p>}
       <fieldset>
         <legend>{question}</legend>
         {(

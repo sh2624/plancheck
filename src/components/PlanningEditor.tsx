@@ -109,7 +109,7 @@ export function PlanningEditor({ state, items, references, onChange, focus, init
       <div className="planning-select">
         <label>
           구조화 항목
-          <select value={record?.id ?? ''} onChange={(e) => setSelected(e.target.value)}>
+          <select aria-label="구조화 항목" value={record?.id ?? ''} onChange={(e) => setSelected(e.target.value)}>
             {rows.map((r) => (
               <option key={r.id} value={r.id}>
                 {r.excluded ? '[제외] ' : r.confirmed ? '[확인] ' : '[미확인] '}

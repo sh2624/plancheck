@@ -1280,10 +1280,16 @@ main {
 .finding-values strong {
   font-size: 20px;
 }
-.finding-support {
-  color: #526174;
-  font-size: 12px;
-  margin: 8px 0;
+.review-reused {
+  color: #334155;
+  font-size: 14px;
+  margin: 0 0 12px;
+}
+.quality-priority .finding-description {
+  font-size: 15px;
+}
+.quality-priority .finding-heading h3 {
+  font-size: 18px;
 }
 .finding[data-tier='상세 분석 기록'] {
   padding-block: 16px;

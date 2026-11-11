@@ -4,6 +4,7 @@ import { applyRecommendation, type ReviewState } from '../recommendations/apply'
 import type { Recommendation } from '../recommendations/types';
 import { loanIdentity } from '../recommendations/recommend';
 import { assessRelationship } from '../normalization/relationships';
+import type { Finding } from './analyze';
 export type ReviewChoice = 'same' | 'different' | 'unknown';
 export type InlineAnswers = {
   asOf?: string;
@@ -20,6 +21,16 @@ export type ReviewDecision = {
 const compact = (s: string) => s.replace(/\s+/g, '');
 const monthly = (s: string) => (['월', '월간', '매월'].includes(compact(s)) ? '월간' : compact(s));
 const flow = (c: Candidate) => ['income', 'fixedExpense', 'variableExpense', 'savings', 'surplus', 'loanPayment'].includes(c.field);
+/** 현재 원본 쌍의 유효한 사용자 승인만 재사용하며 추천이나 다른 위치의 값을 승인으로 간주하지 않는다. */
+export function previouslyApprovedPair(finding: Finding, items: Candidate[]) {
+  const ids = finding.recommendation?.candidateIds ?? [];
+  return (
+    !!finding.approved &&
+    ids.length === 2 &&
+    ids.every((id) => items.some((c) => c.id === id && c.confirmed && !c.excluded)) &&
+    reviewFingerprint(items, ids) === reviewFingerprint(finding.approved.evidence, ids)
+  );
+}
 /** 현재 원본·수치·조건에 한정한 결정이며 편집 후 오래된 결정을 사용하지 않는다. */
 export function reviewFingerprint(items: Candidate[], ids: string[]) {
   return JSON.stringify(
@@ -32,6 +43,8 @@ export function reviewFingerprint(items: Candidate[], ids: string[]) {
             c.fileName,
             c.location,
             c.label,
+            c.originalText,
+            c.originalNumber,
             c.number,
             c.unit,
             c.normalizedValue,

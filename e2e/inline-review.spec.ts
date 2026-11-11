@@ -55,6 +55,7 @@ test('인라인 예·아니요·미확인과 원본 편집이 실제 판정·연
   await expect(card).toContainText('사용자 확인 후 · 확인 필요');
   await expect(panel(page)).toContainText('확정 오류 0');
   await card.getByRole('button', { name: '확인 내용 수정' }).click();
+  await expect(selected(page).getByLabel('예, 같은 기준입니다.', { exact: true })).toBeChecked();
   await selected(page).getByLabel('예, 같은 기준입니다.', { exact: true }).check();
   await expect(selected(page).getByLabel('공통 기준일', { exact: true })).toHaveCount(0);
   await selected(page).getByRole('checkbox').check();

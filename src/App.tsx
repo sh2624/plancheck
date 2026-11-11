@@ -436,7 +436,7 @@ export default function App() {
               setStep('review');
             }}
           >
-            3. 상세 검토 ({review.items.filter((c) => !c.excluded).length})
+            3. 상세 검토
           </Button>
         </nav>
         <p className="muted">
@@ -455,8 +455,8 @@ export default function App() {
           </aside>
         </details>
         <div className="scope">
-          XLSX·DOCX만 지원합니다. 파일은 브라우저에서 처리하며 외부로 전송하지 않습니다. 자동 발견은 확인 후보이며, 최종 오류 판정은 사용자
-          승인과 적용 조건 확인 후에 이루어집니다.
+          XLSX·DOCX는 브라우저 안에서 처리하며 외부로 전송하지 않습니다.
+          {step === 'results' && ' 발견 후보는 같은 대상과 조건인지 확인한 뒤 오류로 판정합니다.'}
         </div>
         <div className="workspace" hidden={step !== 'raw'}>
           <DocumentPanel

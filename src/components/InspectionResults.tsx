@@ -143,9 +143,6 @@ export function InspectionResults(props: Props) {
         <p className="finding-description">
           {!f.decision && !f.approved && (f.relationship?.blocked || contextMismatch(f)) ? entry.reasons[0] : explanation(f)}
         </p>
-        {entry.supportCount > 0 && (
-          <p className="finding-support">같은 발견을 지지하는 별도 원본 {entry.supportCount}건 · 상세 분석 기록에서 확인할 수 있습니다.</p>
-        )}
         <div className="finding-actions">
           <Button
             onClick={() => {
@@ -194,6 +191,7 @@ export function InspectionResults(props: Props) {
         )}
         <details className="finding-proof">
           <summary>판단 근거 보기</summary>
+          {entry.supportCount > 0 && <p>같은 발견을 지지하는 별도 원본 {entry.supportCount}건을 상세 분석 기록에서 확인할 수 있습니다.</p>}
           <p>
             검토 분류: {entry.tier} · {entry.reasons.join(' ')}
           </p>
@@ -273,21 +271,11 @@ export function InspectionResults(props: Props) {
     <section ref={rootRef} className="inspection-results" aria-label="자동 검사 결과">
       <div className="inspection-heading">
         <h2>검사 결과</h2>
-        <span>자동 발견과 확정 오류를 구분합니다</span>
+        <span>필요한 항목만 확인하세요</span>
       </div>
       <div className="inspection-counts">
         <strong>확정 오류 {quality.filter((e) => e.finding.approved?.status === '오류').length}</strong>
-        <span>우선 검토 {quality.filter((e) => e.tier === qualityTiers[0]).length}개</span>
-        <span>
-          자동 수치 차이 후보{' '}
-          {
-            quality.filter(
-              (e) =>
-                !e.finding.approved && e.finding.signal === '수치 차이' && !e.finding.relationship?.blocked && !contextMismatch(e.finding),
-            ).length
-          }
-          건 <small>반복 원본 포함</small>
-        </span>
+        <span>우선 확인할 문제 {quality.filter((e) => e.tier === qualityTiers[0]).length}개</span>
       </div>
       <div className="inspection-filters">
         <label>
@@ -326,16 +314,12 @@ export function InspectionResults(props: Props) {
             공유 원본 기록 모두 펼치기
           </label>
         </details>
-        <span>
-          {filtered.length}개 분석 기록 · 전체 {quality.length}개
-          {findings.length > quality.length && ` · 완전 중복 ${findings.length - quality.length}건 합침`}
-        </span>
       </div>
       <section className="finding-section quality-priority" aria-label="우선 검토">
         <h2>
-          우선 검토 <span>{tierEntries(qualityTiers[0]).length}개 독립 발견</span>
+          우선 확인할 문제 <span>{tierEntries(qualityTiers[0]).length}개</span>
         </h2>
-        <p className="quality-caption">핵심 항목과 원본 관계가 명확한 차이부터 확인하세요. 금액 크기로 정렬하지 않습니다.</p>
+        <p className="quality-caption">값과 원본을 대조하고 ‘이 항목 검토’에서 같은 기준인지 확인하세요.</p>
         {!tierEntries(qualityTiers[0]).length && (
           <p className="section-empty">
             우선 검토할 독립 발견이 없습니다. 추가 검토와 상세 분석 기록을 확인하세요. 정상 판정이라는 뜻은 아닙니다.
@@ -352,7 +336,7 @@ export function InspectionResults(props: Props) {
         }}
       >
         <summary>
-          추가 검토 <span>{tierEntries(qualityTiers[1]).length}건 · 연결·범위·기간 확인</span>
+          추가 확인 <span>{tierEntries(qualityTiers[1]).length}건 · 대상·기간·조건 확인</span>
         </summary>
         <section aria-label="추가 검토">{grouped(qualityTiers[1])}</section>
       </details>
@@ -368,6 +352,23 @@ export function InspectionResults(props: Props) {
           상세 분석 기록 <span>{tierEntries(qualityTiers[2]).length}건 · 반복·조건 차이·보류·통과 기록</span>
         </summary>
         <section aria-label="상세 분석 기록">
+          <p className="quality-caption analysis-count">
+            {filtered.length}개 분석 기록 · 전체 {quality.length}개
+            {findings.length > quality.length && ` · 완전 중복 ${findings.length - quality.length}건 합침`}
+          </p>
+          <p className="quality-caption">
+            자동 수치 차이 후보{' '}
+            {
+              quality.filter(
+                (e) =>
+                  !e.finding.approved &&
+                  e.finding.signal === '수치 차이' &&
+                  !e.finding.relationship?.blocked &&
+                  !contextMismatch(e.finding),
+              ).length
+            }
+            건 · 반복 원본 포함
+          </p>
           <p className="quality-caption">
             원본과 개별 근거를 모두 보존합니다. 부적합한 연결은 비교에서 제외했으며, 보류는 통과가 아닙니다.
           </p>

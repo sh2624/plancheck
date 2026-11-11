@@ -15,7 +15,7 @@ test('전체 기록을 유지하며 핵심 독립 발견·재무 항목 필터·
   await expect(priority.getByRole('heading', { name: /학자금대출 잔액.*15,000원/ })).toBeVisible();
   await expect(priority.getByRole('heading', { name: /잉여금.*23,980원/ })).toBeVisible();
   const priorityCount = await priority.locator('.finding').count(),
-    total = Number((await panel.locator('.inspection-filters > span').innerText()).match(/전체 (\d+)개/)![1]);
+    total = Number((await panel.locator('.analysis-count').textContent())!.match(/전체 (\d+)개/)![1]);
   expect(priorityCount).toBeGreaterThan(0);
   expect(total).toBeGreaterThan(priorityCount);
   await expect(panel).toContainText('확정 오류 0');
@@ -64,7 +64,7 @@ test('전체 기록을 유지하며 핵심 독립 발견·재무 항목 필터·
   await expect(context).toContainText('적용 기간');
   await expect(panel).toContainText('확정 오류 0');
   await page.getByLabel('재무 항목', { exact: true }).selectOption('전체');
-  await expect(panel.locator('.inspection-filters > span')).toContainText(`전체 ${total}개`);
+  await expect(panel.locator('.analysis-count')).toContainText(`전체 ${total}개`);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('heading', { level: 1 }).scrollIntoViewIfNeeded();
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
