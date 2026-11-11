@@ -398,7 +398,7 @@ export default function App() {
         <div className="brand">
           <FileCheck2 aria-hidden />
           <strong>PlanCheck</strong>
-          <span>문서 검수 작업 공간</span>
+          <span>재무 문서 검사기</span>
         </div>
       </header>
       <main>
