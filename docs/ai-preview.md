@@ -2,6 +2,8 @@
 
 ## 배포 전 설정
 
+팀원 전달본과 Production은 AI를 비활성화한다. 빌드는 플랫폼 환경이 preview이고 VITE_ENABLE_AI_CONTEXT=true일 때만 실험 화면을 포함한다. 로컬 AI 모의 E2E에도 VERCEL_ENV=preview를 명시해야 한다. Production에서는 플래그가 true여도 포함하지 않는다. [전달본 배포 안내](team-feedback-release.md)를 우선 따른다.
+
 원격 push·배포는 사용자가 수행한다. `/api/analyze-context`는 Vercel Node Serverless Function이며 Vite는 상대 경로로 호출한다. 로컬 `vite dev`에는 API가 없고, 키 없이도 기본 검사는 모두 동작한다.
 
 Vercel의 **Preview 환경에만** 다음 값을 설정하고 새 Preview를 배포한다.
