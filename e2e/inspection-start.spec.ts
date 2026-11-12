@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
-/** 실제 팀원 파일을 업로드한 뒤 검사 버튼·연결 승인 없이 기본 결과를 확인한다. */
-test('두 파일 등록만으로 다섯 검토 대상을 표시하고 확정 오류를 만들지 않는다', async ({ page }) => {
+/** 실제 팀원 파일을 등록하고 검사 시작 한 번으로 승인 없이 다섯 대상을 확인한다. */
+test('파일 준비 후 검사 시작 한 번으로 다섯 검토 대상을 표시한다', async ({ page }) => {
   const x = process.env.PLANCHECK_TEAM_XLSX,
     d = process.env.PLANCHECK_TEAM_DOCX;
   test.skip(!x || !d, '실제 팀원 파일 필요');
@@ -16,6 +16,10 @@ test('두 파일 등록만으로 다섯 검토 대상을 표시하고 확정 오
   await page.getByLabel(/검토할 Excel/).setInputFiles(x!);
   await expect(page.locator('.inspection-results')).toHaveCount(0);
   await page.getByLabel(/검토할 Word/).setInputFiles(d!);
+  await expect(page.getByText('두 문서가 준비됐습니다', { exact: true })).toBeVisible();
+  await expect(page.locator('.inspection-results')).toHaveCount(0);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('재무설계 문서 검사');
+  await page.getByRole('button', { name: '검사 시작', exact: true }).click();
   const panel = page.getByRole('region', { name: '자동 검사 결과' }),
     priority = panel.locator('.quality-priority');
   await expect(priority).toContainText('20,000원');
@@ -43,7 +47,7 @@ test('두 파일 등록만으로 다섯 검토 대상을 표시하고 확정 오
     await expect(card).toHaveCount(0);
     await expect(panel).toContainText('확인된 오류 0');
   }
-  console.log('팀원 원본: 자동 발견 추가 조작 0회, 복합 관계 보류 답변 각 1회. 최종 오류 승인은 수행하지 않음.');
+  console.log('팀원 원본: 검사 시작 1회, 항목·연결 승인 0회, 복합 관계 보류 답변 각 1회.');
   await page.getByRole('button', { name: '1. 검사 시작', exact: true }).click();
   await page.getByRole('button', { name: 'Word 보고서 초기화' }).click();
   await expect(panel).toHaveCount(0);

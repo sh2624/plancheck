@@ -54,10 +54,26 @@ export default function App() {
     results: true,
   });
   const [registered, setRegistered] = useState({ XLSX: false, DOCX: false });
-  const inspectionStarted = registered.XLSX && registered.DOCX;
+  const [inspectionStatus, setInspectionStatus] = useState<'ready' | 'running' | 'complete'>('ready');
+  const inspectionRun = useRef({ generation: 0 });
+  const inspectionStarted = inspectionStatus === 'complete';
   useEffect(() => {
-    if (inspectionStarted) document.querySelector<HTMLElement>('[aria-label="자동 검사 결과"]')?.scrollIntoView?.({ block: 'start' });
-  }, [inspectionStarted]);
+    const run = inspectionRun.current;
+    return () => {
+      run.generation++;
+    };
+  }, []);
+  /** 진행 문구를 그린 뒤 검사를 실행하며 파일 교체로 취소된 요청은 결과를 열지 않는다. */
+  async function startInspection() {
+    if (!registered.XLSX || !registered.DOCX || inspectionStatus === 'running') return;
+    const ticket = ++inspectionRun.current.generation;
+    setInspectionStatus('running');
+    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+    if (ticket !== inspectionRun.current.generation) return;
+    setInspectionStatus('complete');
+    setStep('results');
+    setAdvancedOpen(false);
+  }
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [inlineDecisions, setInlineDecisions] = useState<Record<string, ReviewDecision>>({});
   const [focusIds, setFocusIds] = useState<string[]>([]);
@@ -277,6 +293,8 @@ export default function App() {
   }
   function replaceSource(source: Candidate['source'], next: Candidate[], references: EvidenceRef[] = [], fingerprint?: string) {
     revision.current++;
+    inspectionRun.current.generation++;
+    setInspectionStatus('ready');
     setAdvancedOpen(false);
     setInlineDecisions({});
     setDocuments((prev) => {
@@ -497,19 +515,17 @@ export default function App() {
           </DocumentPanel>
         </div>
         {step === 'raw' && (
-          <div className="inspection-start">
+          <div className="inspection-start" aria-busy={inspectionStatus === 'running'}>
             <div>
               <strong>{registered.XLSX && registered.DOCX ? '두 문서가 준비됐습니다' : 'Excel과 Word 파일을 각각 등록하세요'}</strong>
               <p>계산·문서 간 수치·자금 배정·계획 후보를 자동 분석합니다. 규칙을 먼저 설정할 필요가 없습니다.</p>
+              {inspectionStatus === 'running' && <p role="status">문서를 비교하고 검토할 항목을 찾고 있습니다…</p>}
             </div>
             <Button
-              disabled={!registered.XLSX || !registered.DOCX}
-              onClick={() => {
-                setStep('results');
-                setAdvancedOpen(false);
-              }}
+              disabled={!registered.XLSX || !registered.DOCX || inspectionStatus === 'running'}
+              onClick={() => void startInspection()}
             >
-              검사 시작
+              {inspectionStatus === 'running' ? '검사 중…' : '검사 시작'}
             </Button>
           </div>
         )}
@@ -534,7 +550,7 @@ export default function App() {
             onConfirm={confirm}
           />
         )}
-        {(step === 'results' || (step === 'raw' && inspectionStarted)) && (
+        {step === 'results' && (
           <>
             <InspectionResults
               onPlanReview={(finding, choice) => {

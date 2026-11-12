@@ -78,7 +78,11 @@ test('검사 시작만으로 차이를 발견하고 선택 검토 후에만 확�
   await page.getByLabel(/검토할 Excel/).setInputFiles(xlsx!);
   await expect(page.getByText('등록 완료 · 추출됨', { exact: true })).toHaveCount(2);
   await page.getByRole('button', { name: '2. 검사 결과' }).click();
-  // 파일 교체 후 이전 승인은 사라지고 새 파일의 미승인 자동 발견을 다시 표시한다.
+  // 파일 교체 후 이전 결과를 무효화하고 명시적으로 재검사해야 한다.
+  await expect(results).toContainText('두 문서를 등록하고 검사를 시작하세요');
+  await expect(results.locator('.finding')).toHaveCount(0);
+  await page.getByRole('button', { name: '1. 검사 시작', exact: true }).click();
+  await page.getByRole('button', { name: '검사 시작', exact: true }).click();
   await expect(results).toContainText('확인된 오류 0');
   await expect(results.locator('.quality-priority .finding').first()).toBeVisible();
   expect(errors).toEqual([]);
