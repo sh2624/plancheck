@@ -45,3 +45,4 @@ coverage/
 # Browser E2E artifacts may contain private source text
 /test-results/
 /playwright-report/
+.vercel/
