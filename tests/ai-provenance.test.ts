@@ -12,6 +12,49 @@ const proposal: Proposal = {
   evidence: [{ sourceId: 's0', quote: sources[0].text, target: '별빛 지원금', number: '173', unit: '만 원', action: null, timing: null }],
 };
 describe('AI 출처의 안전한 표기 정규화', () => {
+  it('다른 문장의 같은 기간 참조는 날짜를 확정하지 않는다', () => {
+    const timingSources = [
+      { id: 's0', text: '2031-03-01부터 2031-03-31까지 별빛 예금 173만원을 배정한다.' },
+      { id: 's1', text: '같은 기간 별빛 예금 20만원을 추가 배정한다.' },
+    ];
+    const evidence = timingSources.map((s, i) => ({
+      sourceId: s.id,
+      quote: s.text,
+      target: '별빛 예금',
+      number: i ? '20' : '173',
+      unit: '만원',
+      action: null,
+      timing: '2031-03-01부터 2031-03-31까지',
+    }));
+    const result = readProposals({ proposals: [{ ...proposal, kind: 'allocation', certainty: 'confirmed', evidence }] }, timingSources)[0];
+    expect(result.evidence[1].timing).toBeNull();
+    expect(result.certainty).toBe('unknown');
+    expect(result.uncertainty).toContain('확인 필요');
+    expect(() =>
+      readProposals(
+        { proposals: [{ ...proposal, kind: 'allocation', evidence: evidence.map((e) => ({ ...e, timing: '2099-01-01' })) }] },
+        timingSources,
+      ),
+    ).toThrow();
+  });
+  it('다른 상품의 행동을 같은 관계로 승인하지 않는다', () => {
+    const inputs = [
+      { id: 's0', text: '별빛 ETF 적립 중단' },
+      { id: 's1', text: '새벽 ISA 적립 시작' },
+    ];
+    const evidence = inputs.map((s, i) => ({
+      sourceId: s.id,
+      quote: s.text,
+      target: i ? '새벽 ISA' : '별빛 ETF',
+      number: null,
+      unit: null,
+      action: i ? '시작' : '중단',
+      timing: null,
+    }));
+    expect(() => readProposals({ proposals: [{ ...proposal, kind: 'action_conflict', evidence }] }, inputs)).toThrow(
+      'RELATION_TARGET_MISMATCH',
+    );
+  });
   it.each([
     ['1730000', '원', '173만 원'],
     ['1,730,000', '원', '173만원'],

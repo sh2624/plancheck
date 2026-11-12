@@ -53,6 +53,7 @@ export function readProposals(value: unknown, sources: ContextSource[]): Proposa
     throw new Error('INVALID_OUTPUT');
   return value.proposals.map((p: unknown, proposalIndex: number) => {
     const path = `proposals[${proposalIndex}]`;
+    let referencedTiming = false;
     if (
       !object(p) ||
       !keys(p, ['kind', 'evidence', 'uncertainty', 'certainty']) ||
@@ -65,7 +66,8 @@ export function readProposals(value: unknown, sources: ContextSource[]): Proposa
       p.evidence.length > 8
     )
       throw new Error('INVALID_PROPOSAL');
-    const evidence = p.evidence.map((e: unknown, evidenceIndex: number) => {
+    const rawEvidence = p.evidence;
+    const evidence = rawEvidence.map((e: unknown, evidenceIndex: number) => {
       const base = `${path}.evidence[${evidenceIndex}]`;
       if (
         !object(e) ||
@@ -86,13 +88,30 @@ export function readProposals(value: unknown, sources: ContextSource[]): Proposa
       const absent = (value: unknown) => (value === 'null' ? null : value);
       const number = absent(e.number),
         unit = absent(e.unit),
-        action = absent(e.action),
-        timing = absent(e.timing);
+        action = absent(e.action);
+      let timing = absent(e.timing);
       let amount: { number: string; unit: string } | null = null;
       if (number !== null || unit !== null) {
         if (typeof number !== 'string' || typeof unit !== 'string') reject(`${base}.number`, 'INVALID_UNIT', 'amount');
         amount = originalAmount(number, unit, quote);
         if (!amount) reject(`${base}.number`, 'UNSUPPORTED_AMOUNT_UNIT', 'amount');
+      }
+      if (typeof timing === 'string' && !originalSpan(quote, timing) && /(?:같은|동일한?|해당)\s*(?:기간|시점|날짜)/.test(quote)) {
+        const literal = timing;
+        const supporting = rawEvidence.some(
+          (other: unknown) =>
+            object(other) &&
+            other.sourceId !== e.sourceId &&
+            typeof other.sourceId === 'string' &&
+            typeof other.quote === 'string' &&
+            sources.some(
+              (s) => s.id === other.sourceId && originalSpan(s.text, other.quote as string) && originalSpan(other.quote as string, literal),
+            ),
+        );
+        if (supporting) {
+          timing = null;
+          referencedTiming = true;
+        }
       }
       for (const [field, value] of [
         ['action', action],
@@ -118,7 +137,14 @@ export function readProposals(value: unknown, sources: ContextSource[]): Proposa
         timing: timing === null ? null : originalSpan(quote, timing as string),
       };
     });
-    return { kind: p.kind as Proposal['kind'], evidence, uncertainty: p.uncertainty, certainty: p.certainty as Proposal['certainty'] };
+    if (p.kind === 'action_conflict' && new Set(evidence.map((e) => e.target?.replace(/\s/g, '')).filter(Boolean)).size > 1)
+      reject(`${path}.evidence`, 'RELATION_TARGET_MISMATCH', 'target');
+    return {
+      kind: p.kind as Proposal['kind'],
+      evidence,
+      uncertainty: p.uncertainty + (referencedTiming ? ' 적용 시점은 다른 문장을 참조하므로 확인 필요.' : ''),
+      certainty: referencedTiming || evidence.some((e) => e.target === null) ? 'unknown' : (p.certainty as Proposal['certainty']),
+    };
   });
 }
 const nullable = { type: ['string', 'null'] };
