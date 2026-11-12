@@ -141,7 +141,7 @@ export const outputSchema = {
                 target: { type: 'string' },
                 number: nullable,
                 unit: nullable,
-                action: nullable,
+                action: { type: ['string', 'null'], enum: ['유지', '중단', '시작', '증액', '감액', null] },
                 timing: nullable,
               },
             },

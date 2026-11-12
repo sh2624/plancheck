@@ -7,6 +7,7 @@
 Vercel의 **Preview 환경에만** 다음 값을 설정하고 새 Preview를 배포한다.
 
 - `OPENAI_API_KEY`: 기존 서버 키. `VITE_` 접두사를 붙이지 않는다.
+- `OPENAI_MODEL=gpt-4o-mini`: 서버 모델 선택. 현재 실험은 이 모델만 허용한다.
 - `PLANCHECK_AI_ENABLED=true`: 서버 실험 허용.
 - `VITE_ENABLE_AI_CONTEXT=true`: 실험 UI 빌드 허용.
 
@@ -20,7 +21,7 @@ Production에서는 두 활성화 값을 제거한다. 서버는 `VERCEL_ENV=pre
 
 2026-11-12 점검 기준 기능 커밋은 `1a0caa8`이다. `plancheck.cloud/api/analyze-context`의 GET 요청은 www 도메인으로 이동한 뒤 404를 반환했다. 해당 도메인에서 신규 API가 실행된다는 근거는 아직 없다. GET이 정상 핸들러에 도달하면 인증 통과 후 `405 POST_REQUIRED`가 나와야 한다. 이 응답만으로 Preview 환경·키·외부 API 동작까지 확인되는 것은 아니다.
 
-Vercel 프로젝트에서 먼저 Preview 전용 환경변수 3개와 Deployment Protection의 Vercel Authentication을 설정한다. **보호된 Preview 생성 URL**이 인증 없이 접근되지 않는지 확인하기 전에는 실제 문서 분석을 실행하지 않는다. 코드에는 자체 인증·사용자별 호출 제한이 없고 Origin은 생략/위조할 수 있으므로 요청당 제한만으로 무제한 호출을 막지 못한다.
+Vercel 프로젝트에서 먼저 Preview 전용 환경변수 4개와 Deployment Protection의 Vercel Authentication을 설정한다. **보호된 Preview 생성 URL**이 인증 없이 접근되지 않는지 확인하기 전에는 실제 문서 분석을 실행하지 않는다. 코드에는 자체 인증·사용자별 호출 제한이 없고 Origin은 생략/위조할 수 있으므로 요청당 제한만으로 무제한 호출을 막지 못한다.
 
 CLI를 사용할 경우 아래 명령은 사용자가 직접 실행한다. `--prod`와 Production 승격은 사용하지 않는다. 기존 PlanCheck 프로젝트를 선택하고 Environment가 Preview인지 배포 상세에서 확인한다. Git의 main push는 프로젝트 설정에 따라 Production 배포를 유발할 수 있으므로 Preview 검증만을 위해 바로 실행하지 않는다.
 
@@ -63,7 +64,7 @@ PowerShell에서 `PLANCHECK_PREVIEW_URL`을 실제 Preview URL로 지정한 뒤 
 ## 공식 규격과 모델
 
 - [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs): Responses의 strict JSON schema, 거부·불완전 응답을 별도로 처리한다.
-- [GPT-5.6 Terra 모델](https://developers.openai.com/api/docs/models/gpt-5.6-terra): 모델 ID 고정, 입력 $2/백만 토큰·출력 $12/백만 토큰으로 보수적 비용 계산. 가격/가용성은 실제 실험 전에 다시 확인한다.
+- [GPT-4o Mini 모델](https://developers.openai.com/api/docs/models/gpt-4o-mini): 사용자 요청에 따라 서버 OPENAI_MODEL=gpt-4o-mini를 사용한다. 입력 $0.15/백만 토큰·출력 $0.60/백만 토큰으로 캐시 할인을 제외한 보수적 비용을 계산한다. Responses와 Structured Outputs를 지원하며 reasoning 옵션은 보내지 않는다. 공식 문서상 deprecated 모델이므로 장기 운영 적합성은 별도 검토한다. 이번 연결 실험에서 임의로 다른 모델로 교체하지 않는다.
 - [Vercel Node 런타임](https://vercel.com/docs/functions/runtimes/node-js): 루트 `api`의 Web Request/Response 핸들러 사용. 추가 서버 유틸은 `server`에 두었다.
 
 ## 현재 검증 범위
