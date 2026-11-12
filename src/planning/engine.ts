@@ -138,6 +138,21 @@ function evaluateAllocations(items: Candidate[], allocations: Allocation[], disc
       }
     }
     const available = asset!.normalizedValue!;
+    const explicit =
+      discovery &&
+      rows.length > 1 &&
+      rows.every((r) => r.relation?.explicit && r.funding !== '미래 적립금') &&
+      new Set(rows.map((r) => r.scenario.trim())).size === 1 &&
+      new Set(rows.map((r) => r.relation?.timing ?? '')).size === 1;
+    // 날짜가 없으면 실제 동시 사용을 단정하지 않고 같은 시점이라는 가정의 초과액만 계산한다.
+    const hypothetical = explicit
+      ? periods.every((p) => p === null)
+        ? sumAmounts(rows)
+        : periods.every((p) => p !== null) && rows.every((r) => r.funding === '현재 자산')
+          ? max
+          : null
+      : null;
+    const preview = hypothetical !== null && hypothetical > available;
     if (available < 0) needs.push('사용 가능한 보유액이 음수입니다.');
     const details = rows
       .map(
@@ -145,14 +160,25 @@ function evaluateAllocations(items: Candidate[], allocations: Allocation[], disc
           `${r.label}: 자산=${asset!.label}(${asset!.id}, ${available}원), 목표=${goals[i]!.label}(${goals[i]!.normalizedValue}원), 배정=${money(r.amount, r.unit)}원, ${r.start}~${r.end}, ${r.funding}, ${r.certainty}, 시나리오=${r.scenario}`,
       )
       .join('\n');
-    const basis = `${details}\n동시 배정 최대액=${max}원, 사용 가능 보유액=${available}원. 사용 기간은 양 끝 날짜를 포함합니다. 최대 동시 항목: ${peakRows.map((r) => r.label).join(', ')}. 순차 사용의 원금 소진·미래 잔액 자체는 검사하지 않습니다.`;
+    const observed = periods.every((p) => p !== null) && rows.every((r) => r.funding === '현재 자산');
+    const basis = `${details}\n동시 배정 최대액=${observed ? `${max}원` : '미확인'}, 사용 가능 보유액=${available}원. 사용 기간은 양 끝 날짜를 포함합니다. 최대 동시 항목: ${peakRows.map((r) => r.label).join(', ')}. 순차 사용의 원금 소진·미래 잔액 자체는 검사하지 않습니다.`;
     out.push({
       ...base,
       status: needs.length ? '확인 필요' : max > available ? '오류' : '검증 통과',
-      actual: needs.length ? null : max,
+      actual: preview ? hypothetical : needs.length ? null : max,
       expected: available,
-      difference: needs.length ? null : max - available,
-      basis,
+      difference: preview ? hypothetical - available : needs.length ? null : max - available,
+      basis: preview
+        ? `${basis}\n동일 시점·현재 자산을 사용한다는 가정의 배정 합계=${hypothetical}원, 초과액=${hypothetical - available}원. 사용 시점과 재원은 아직 확인되지 않았습니다.`
+        : basis,
+      ...(preview
+        ? {
+            reviewHint: {
+              title: `같은 ${asset!.label}의 배정액이 보유액을 넘을 수 있습니다`,
+              question: '두 배정은 같은 시점에 현재 보유한 자금을 사용하나요?',
+            },
+          }
+        : {}),
       needs,
     });
   }
@@ -169,7 +195,23 @@ function evaluateConditionalFunds(items: Candidate[], state: Planning, discovery
       if (amount === null || amount < 0) unavailable.push('0 이상의 금액·단위를 확인하세요.');
       if (unavailable.length) return { ...base, needs: unavailable };
       const basis = `금액=${amount}원, 상태=${row.certainty}, 승인=${row.approval}, 수령=${row.received}, 반영처=${row.destination}, 반영일=${row.reflectedAt || '미확인'}, 검토 기준일=${state.asOf || '미확인'}, 시나리오=${row.scenario || '미확인'}.`;
-      const next = { ...base, actual: amount, basis };
+      const next = {
+        ...base,
+        actual: amount,
+        basis: `${basis}${row.relation?.timing ? ` 원문 시점=${row.relation.timing}.` : ''}`,
+        ...(discovery &&
+        row.relation?.explicit &&
+        row.destination !== '예상 시나리오' &&
+        row.destination !== '미반영' &&
+        !(row.certainty === '확정' && (row.received === '수령' || (row.approval === '승인' && row.destination === '확정 수입')))
+          ? {
+              reviewHint: {
+                title: `${row.label} 예상액이 자산에 반영된 문맥입니다`,
+                question: '이 금액의 지급 조건과 실제 반영 시점이 확정됐나요?',
+              },
+            }
+          : {}),
+      };
       if (!row.scenario.trim())
         return {
           ...next,
@@ -255,7 +297,29 @@ function evaluateActions(items: Candidate[], actions: PlanAction[], discovery = 
         needs.push('0원 행동이므로 중단과 현금흐름이 실제로 충돌하는지 확인하세요.');
       const basis = `대상=${a.targetId}. 제안 ${a.action}(${a.start}~${a.end}, ${a.scenario}, ${a.amount || '금액 미기재'} ${a.unit}) / 실행 ${b.action}(${b.start}~${b.end}, ${b.scenario}, ${b.amount || '금액 미기재'} ${b.unit}). 양 끝 날짜를 포함한 동일 대상·겹치는 기간에 한정합니다.`;
       if (needs.length) {
-        output.push({ ...base, status: '확인 필요', basis, needs });
+        const explicit =
+          discovery &&
+          a.relation?.explicit &&
+          b.relation?.explicit &&
+          opposite(a.action, b.action) &&
+          (!a.scenario || !b.scenario || a.scenario === b.scenario) &&
+          (!x || !y || !(x[1] < y[0] || y[1] < x[0])) &&
+          (!a.relation.timing || !b.relation.timing || a.relation.timing === b.relation.timing) &&
+          ![a, b].some((r) => r.amount.trim() && money(r.amount, r.unit) === 0);
+        output.push({
+          ...base,
+          status: '확인 필요',
+          basis,
+          needs,
+          ...(explicit
+            ? {
+                reviewHint: {
+                  title: `${a.targetId} ${a.action} 제안과 ${b.action} 실행이 함께 있습니다`,
+                  question: '두 행동은 같은 상품의 동일한 적립과 같은 적용 기간을 뜻하나요?',
+                },
+              }
+            : {}),
+        });
         continue;
       }
       if (x![1] < y![0] || y![1] < x![0]) {
@@ -270,6 +334,14 @@ function evaluateActions(items: Candidate[], actions: PlanAction[], discovery = 
         output.push({
           ...base,
           status: '오류',
+          ...(discovery && a.relation?.explicit && b.relation?.explicit
+            ? {
+                reviewHint: {
+                  title: `${a.targetId} ${a.action} 제안과 ${b.action} 실행이 함께 있습니다`,
+                  question: '두 행동은 같은 상품의 동일한 적립과 같은 적용 기간을 뜻하나요?',
+                },
+              }
+            : {}),
           basis: `${basis} 중단과 유지/시작/증액 또는 증액과 감액 행동이 충돌합니다.`,
         });
         continue;

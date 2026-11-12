@@ -159,6 +159,12 @@ function assess(f: InputFinding): {
       score: 0,
     };
   if (r.status === '검증 불가') return { tier: qualityTiers[2], reasons: r.needs, score: 0 };
+  if (!f.approved && r.reviewHint && r.references?.length)
+    return {
+      tier: qualityTiers[0],
+      reasons: [r.reviewHint.question, '명시된 원문 관계의 검토 후보이며 사용자 승인 전 오류가 아닙니다.'],
+      score: 70,
+    };
   if (f.approved?.status === '검증 통과' || f.signal === '수치 일치')
     return {
       tier: qualityTiers[2],

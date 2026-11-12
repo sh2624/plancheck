@@ -26,6 +26,8 @@ export type Calculation = {
   loanBasis: '미확인' | '최초 원금·전체 기간' | '현재 잔액·잔여 기간';
 };
 export type Result = {
+  /** 명시된 원문 관계의 확인 질문이며 확정 판정을 대신하지 않는다. */
+  reviewHint?: { title: string; question: string };
   id: string;
   code: string;
   title: string;

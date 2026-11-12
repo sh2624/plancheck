@@ -1,5 +1,6 @@
 ﻿import type { Candidate, Link, Field } from '../normalization/types';
-import { compatibleUnit, unitOf, normalize } from '../normalization/values';
+import { compatibleUnit, normalize } from '../normalization/values';
+import { allocationText } from '../planning/allocationText';
 import { suggestLinks } from '../normalization/links';
 import { newCalculation, rules, ruleTitles } from '../validation/types';
 import type { Rule, EvidenceRef } from '../validation/types';
@@ -208,39 +209,56 @@ function alias(label: string) {
 export function allocationRecommendations(items: Candidate[], references: EvidenceRef[]): Recommendation[] {
   const output: Recommendation[] = [];
   for (const ref of references)
-    for (const [index, match] of [
-      ...ref.originalText.matchAll(
-        /([^.;\n|]+?)\s*(\d[\d,]*(?:\.\d+)?)\s*(억\s*원|만\s*원|원)(?:을|를)?\s*([^.;\n|]+?)(?:에|으로)\s*(?:우선\s*)?(?:배정|할당)/g,
-      ),
-    ].entries()) {
-      const from = match[1].trim().replace(/^(?:재원은|자금은)\s*/, ''),
-        to = match[4].trim();
-      const assets = items.filter(
+    for (const parsed of allocationText(ref)) {
+      const { asset: from, goal: to, index, unit } = parsed;
+      let assets = items.filter(
         (c) =>
-          comparable(c) &&
-          ['deposit', 'etf', 'pension', 'housingDeposit'].includes(c.field) &&
-          alias(c.label).includes(from.replace(/\s/g, '')),
+          comparable(c) && ['deposit', 'etf', 'pension', 'housingDeposit'].includes(c.field) && alias(c.label) === from.replace(/\s/g, ''),
       );
-      const goals = items.filter((c) => comparable(c) && c.field === 'goalAmount' && alias(c.label).includes(to.replace(/\s/g, '')));
-      if (assets.length !== 1 || goals.length !== 1) continue;
-      const unit = unitOf(match[3]);
-      if (normalize(match[2], unit) === null) continue;
+      const localAssets = assets.filter((c) => c.source === ref.source && c.fileName === ref.fileName);
+      if (localAssets.length) assets = localAssets;
+      if (new Set(assets.map((c) => JSON.stringify([c.normalizedValue, c.asOf, c.scenario, c.certainty]))).size !== 1) continue;
+      if (assets.length > 1) {
+        const tableAssets = assets.filter((c) => /표/.test(c.location));
+        if (tableAssets.length !== 1) continue;
+        assets = tableAssets;
+      }
+      let goals = items.filter(
+        (c) => comparable(c) && c.field === 'goalAmount' && alias(c.label).replace(/목표(?:액|금액)$/, '') === to.replace(/\s/g, ''),
+      );
+      const declaredGoals = goals.filter(
+        (c) => !c.location.includes('배정목표') && (!parsed.context.scenario || !c.scenario || parsed.context.scenario === c.scenario),
+      );
+      const localGoals = goals.filter((c) => c.source === ref.source && c.fileName === ref.fileName && c.originalText === ref.originalText);
+      if (declaredGoals.length === 1) goals = declaredGoals;
+      else if (localGoals.length) goals = localGoals;
+      if (!assets.length || goals.length !== 1 || normalize(parsed.amount, unit) === null) continue;
       const id = `recommended:allocation:${ref.source}:${ref.fileName}:${ref.location}:${index}`;
       const allocation = {
         ...newRecord('allocation', id),
         label: `${from} → ${to}`,
         assetId: assets[0].id,
         goalId: goals[0].id,
-        amount: match[2],
+        amount: parsed.amount,
         unit,
         references: [ref],
+        origin: '자동 후보' as const,
+        start: parsed.context.start,
+        end: parsed.context.end,
+        scenario: parsed.context.scenario,
+        funding: parsed.future
+          ? ('미래 적립금' as const)
+          : /현재|보유/.test(ref.originalText)
+            ? ('현재 자산' as const)
+            : ('미확인' as const),
+        relation: { kind: 'allocation' as const, timing: parsed.context.timing, explicit: true },
       };
       output.push({
         id,
         kind: 'ALLOC',
         title: allocation.label,
         candidateIds: [assets[0].id, goals[0].id],
-        reason: '원문에 배정·할당 관계와 금액이 명시되어 있고 각 명칭의 후보가 하나입니다.',
+        reason: '원문에 배정·확보·충당 관계와 금액이 명시되어 있으며 보유 자산과 목표의 원본 근거를 연결했습니다.',
         risks: ['사용 기간·시나리오·현재 자산/미래 적립금·배정 상태는 사용자 확인이 필요합니다.'],
         missing: ['배정 조건 확인 필요'],
         confidence: '원문 검토 필요',
@@ -297,7 +315,9 @@ export function recommend(
       ],
       confidence: row.approval !== '미확인' && row.received !== '미확인' ? '원문 검토 필요' : '정보 부족',
       primary:
-        row.confirmed || (['현재 자산', '확정 수입'].includes(row.destination) && row.approval !== '미확인' && row.received !== '미확인'),
+        row.confirmed ||
+        (row.relation?.explicit && row.destination !== '예상 시나리오' && row.destination !== '미반영') ||
+        (['현재 자산', '확정 수입'].includes(row.destination) && row.approval !== '미확인' && row.received !== '미확인'),
       references: row.references,
       planFocus: { kind: 'funds', id: row.id },
     });
@@ -329,7 +349,16 @@ export function recommend(
         ...(!peers.length ? ['대응 계획 연결 확인 필요'] : []),
       ],
       confidence: peers.length ? '원문 검토 필요' : '정보 부족',
-      primary: row.confirmed || peers.some((p) => p.start && p.end && row.start && row.end && p.scenario && p.scenario === row.scenario),
+      primary:
+        row.confirmed ||
+        peers.some(
+          (p) =>
+            (p.start && p.end && row.start && row.end && p.scenario && p.scenario === row.scenario) ||
+            (p.relation?.explicit &&
+              row.relation?.explicit &&
+              ((p.action === '중단' && ['유지', '시작', '증액'].includes(row.action)) ||
+                (row.action === '중단' && ['유지', '시작', '증액'].includes(p.action)))),
+        ),
       references: row.references,
       planFocus: { kind: 'actions', id: row.id },
     });

@@ -24,6 +24,7 @@ export type Finding = {
   questions: string[];
 };
 export type InspectionInput = {
+  compoundDiscovery?: boolean;
   items: Candidate[];
   links: Link[];
   calculations: Calculation[];
@@ -46,6 +47,7 @@ export function inspectDocuments(input: InspectionInput): Finding[] {
   const planningResults = discoverPlanning(items, proposed);
   const out: Finding[] = [];
   function append(r: Result, rec?: Recommendation) {
+    if (input.compoundDiscovery === false && r.reviewHint) r = { ...r, reviewHint: undefined };
     const kind: Finding['kind'] = r.code.startsWith('CALC')
       ? 'CALC'
       : r.code.startsWith('CROSS')
@@ -106,13 +108,13 @@ export function inspectDocuments(input: InspectionInput): Finding[] {
     out.push({
       id: kind === 'PLAN' || kind === 'ALLOC' ? r.id : (rec?.id ?? r.id),
       kind,
-      title: approved ? presentResult(approved).headline : title,
+      title: approved ? presentResult(approved).headline : (r.reviewHint?.title ?? title),
       signal,
       result: r,
       recommendation: rec,
       approved,
       primary: rec?.primary ?? (r.id.startsWith('actions:') || r.code === 'ALLOC_CAPACITY' || r.actual !== null),
-      questions: [...new Set(questions)],
+      questions: [...new Set([...(r.reviewHint ? [r.reviewHint.question] : []), ...questions])],
     });
   }
   for (const rec of suggestions) {

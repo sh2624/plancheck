@@ -152,7 +152,7 @@ async function evaluate(kind: AccuracyCase, faulty: boolean, options = {}) {
   const final = results.filter(relevantResult);
   expect(final).toHaveLength(1);
   expect(automatic.every((f) => !f.approved && f.result.status !== '오류' && f.result.status !== '검증 통과')).toBe(true);
-  const autoDetected = automatic.some((f) => f.signal === '수치 차이' && (f.result.difference ?? 0) !== 0);
+  const autoDetected = automatic.some((f) => (f.signal === '수치 차이' && (f.result.difference ?? 0) !== 0) || !!f.result.reviewHint);
   const sourcePreserved = final.every(
     (r) =>
       (r.evidence.length > 0 || !!r.references?.length) &&
@@ -169,7 +169,7 @@ it.skipIf(!available).each(accuracyCases)(
       good = await evaluate(kind, false);
     expect(bad.final.status, bad.final.needs.join() + ' ' + bad.final.basis).toBe('오류');
     expect(good.final.status).toBe('검증 통과');
-    expect(bad.autoDetected).toBe(['CALC', 'CROSS'].includes(kind));
+    expect(bad.autoDetected).toBe(true);
     if (kind === 'CALC') expect(bad.final).toMatchObject({ actual: 70000, expected: 90000, difference: -20000 });
     if (kind === 'CROSS') expect(Math.abs(bad.final.difference!)).toBe(200000);
     if (kind === 'ALLOC') expect(bad.final).toMatchObject({ actual: 8900000, expected: 5900000, difference: 3000000 });

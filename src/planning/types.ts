@@ -9,6 +9,8 @@ export type RecordBase = {
   candidateIds: string[];
   note: string;
   origin: '자동 후보' | '직접 입력';
+  /** 자동 발견의 원문 관계이며 사용자 승인을 뜻하지 않는다. */
+  relation?: { kind: 'allocation' | 'reflection' | 'action'; timing: string; explicit: boolean };
 };
 export type Allocation = RecordBase & {
   assetId: string;

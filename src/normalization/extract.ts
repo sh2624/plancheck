@@ -2,15 +2,12 @@
 import type { Candidate, Field, Unit } from './types';
 import { classify, normalize, unitOf } from './values';
 import { isDateTimeFormat } from '../parsers/numberFormat';
+import { allocationGoals } from './allocationGoals';
+import { emptyContext, readContext, inheritContext, type Context } from './context';
 import { declaredUnits, isHeader, isDateText, resolveUnit, periodOf, type UnitHint } from './unitContext';
 const numeric = /^[+-]?(?:\d[\d,]*(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?\s*(?:억\s*원|만\s*원|원|%|개월|년)?$/i;
 const token = /[+-]?\d[\d,]*(?:\.\d+)?(?:e[+-]?\d+)?/i;
-function metadata(text: string) {
-  return {
-    asOf: text.match(/(?:기준\s*(?:시점|시기|일)?\s*[:：]?\s*)([^·\n]{1,24})/)?.[1]?.trim() ?? '',
-    scenario: text.match(/(?:[A-D]안|대체\s*시나리오|기본안|위기\s*예산|시나리오\s*[A-D가-힣0-9]+)/)?.[0] ?? '',
-  };
-}
+const metadata = (text: string) => readContext(text, '', 'paragraph');
 function certainty(text: string): Candidate['certainty'] {
   if (/조건부|선정\s*시|확정\s*시|가정.*조건/.test(text)) return '조건부';
   if (/미확인|확인\s*(필요|전|후|중)|미정/.test(text)) return '미확인';
@@ -28,7 +25,7 @@ function candidate(
   field: Field,
   unit: Unit,
   context: string,
-  meta: { asOf: string; scenario: string },
+  meta: { asOf: string; scenario: string; evidence?: Context['evidence'] },
   period: string,
   note = '',
 ): Candidate {
@@ -45,7 +42,9 @@ function candidate(
     unit,
     normalizedValue: normalize(number, unit),
     field,
-    ...meta,
+    asOf: meta.asOf,
+    scenario: meta.scenario,
+    contextEvidence: meta.evidence,
     period,
     certainty: certainty(context),
     confirmed: false,
@@ -71,7 +70,8 @@ export function extractWorkbook(book: Workbook): Candidate[] {
     const rows = new Map<number, typeof sheet.cells>();
     for (const cell of sheet.cells) rows.set(rowNumber(cell.address), [...(rows.get(rowNumber(cell.address)) ?? []), cell]);
     let sheetHint: UnitHint | undefined, tableHint: UnitHint | undefined;
-    let meta = { asOf: '', scenario: '' },
+    let globalMeta = emptyContext(),
+      meta = emptyContext(),
       previousRow = 0,
       region = `${sheet.name}:1`,
       title = '',
@@ -83,6 +83,7 @@ export function extractWorkbook(book: Workbook): Candidate[] {
     for (const cells of rows.values()) {
       const row = rowNumber(cells[0].address);
       if (previousRow && row > previousRow + 1) {
+        meta = inheritContext(globalMeta, emptyContext());
         headers.clear();
         columnHints.clear();
         tableHint = undefined;
@@ -109,11 +110,10 @@ export function extractWorkbook(book: Workbook): Candidate[] {
         if (hint.level === 'sheet') sheetHint = hint;
         else tableHint = hint;
       }
-      const found = metadata(text);
-      meta = {
-        asOf: found.asOf || meta.asOf,
-        scenario: found.scenario || meta.scenario,
-      };
+      const globalDeclaration = /(?:시트|문서)\s*(?:전체|공통)|전체\s*(?:문서|시트)/.test(text);
+      const found = readContext(text, `${sheet.name}!${cells.map((c) => c.address).join(',')}`, globalDeclaration ? 'sheet' : 'table');
+      if (globalDeclaration) globalMeta = inheritContext(globalMeta, found);
+      meta = inheritContext(meta, found);
       const hasNumbers = cells.some((c) => numeric.test(c.value.trim()));
       if (!hasNumbers && cells.some((c) => isHeader(c.value))) {
         if (row !== titleRow + 1) tableHint = undefined;
@@ -145,6 +145,7 @@ export function extractWorkbook(book: Workbook): Candidate[] {
         continue;
       }
       if (!hasNumbers && cells.length === 1 && /표|현황|명세|내역/.test(text)) {
+        meta = inheritContext(globalMeta, found);
         headers.clear();
         columnHints.clear();
         region = `${sheet.name}:${row}`;
@@ -240,7 +241,7 @@ export function extractWorkbook(book: Workbook): Candidate[] {
   return output;
 }
 /** 문단에서 명시 단위가 있는 수치만 근접 항목명에 연결하고 복잡한 문장은 확인 대상으로 남긴다. */
-function prose(text: string, location: string, fileName: string, globalMeta: { asOf: string; scenario: string }): Candidate[] {
+function prose(text: string, location: string, fileName: string, globalMeta: Context): Candidate[] {
   const result: Candidate[] = [];
   const matches = [...text.matchAll(/([+-]?\d[\d,]*(?:\.\d+)?)\s*(억\s*원|만\s*원|원|%|개월)/g)];
   for (const match of matches) {
@@ -290,6 +291,7 @@ function prose(text: string, location: string, fileName: string, globalMeta: { a
         {
           asOf: globalMeta.asOf,
           scenario: metadata(text).scenario || globalMeta.scenario,
+          evidence: globalMeta.evidence,
         },
         future ?? (/월/.test(label) || (field === 'savings' && /월/.test(before)) ? '월간' : ''),
         '문단 근접 추출 · 수치의 대상과 적용 시점 확인 필요',
@@ -342,24 +344,26 @@ function prose(text: string, location: string, fileName: string, globalMeta: { a
 export function extractWord(doc: WordDocument): Candidate[] {
   const output: Candidate[] = [];
   let unit: Unit = '미확인',
-    meta = { asOf: '', scenario: '' };
+    globalMeta = emptyContext(),
+    meta = emptyContext();
   for (const block of doc.blocks) {
     if (block.kind === 'paragraph') {
+      if (/^\s*\d+\s*단계|^\s*(?:표|현황|명세|내역)\s*[:：]/.test(block.text)) meta = inheritContext(globalMeta, emptyContext());
       if (/단위\s*[:：]/.test(block.text)) unit = unitOf(block.text.match(/단위\s*[:：]\s*([^·\n]+)/)?.[1] ?? '');
-      const found = metadata(block.text);
-      if (/기준\s*(시점|일)/.test(block.text))
-        meta = {
-          asOf: found.asOf || meta.asOf,
-          scenario: found.scenario || meta.scenario,
-        };
+      const globalDeclaration = /문서\s*(?:전체|공통)|전체\s*문서/.test(block.text);
+      const found = readContext(block.text, block.location, globalDeclaration ? 'document' : 'paragraph');
+      if (globalDeclaration) globalMeta = inheritContext(globalMeta, found);
+      meta = inheritContext(meta, found);
       output.push(...prose(block.text, block.location, doc.fileName, meta));
       continue;
     }
     let headers = block.rows[0] ?? [];
+    let tableMeta = inheritContext(meta, emptyContext());
     const columnUnits = new Map<number, UnitHint>();
     let previousHeader = false;
     let category = '';
     block.rows.forEach((row, ri) => {
+      tableMeta = inheritContext(tableMeta, readContext(row.map((c) => c.text).join(' | '), `${block.location} · ${ri + 1}행`, 'table'));
       if (row.some((c) => isHeader(c.text)) && !row.some((c) => numeric.test(c.text.trim()))) {
         if (!previousHeader) columnUnits.clear();
         const old = headers;
@@ -398,13 +402,13 @@ export function extractWord(doc: WordDocument): Candidate[] {
               missingField,
               unit,
               row.map((c) => c.text).join(' | '),
-              meta,
+              tableMeta,
               '',
               '값 없음 · 원문 확인 필요',
             ),
           );
         }
-        for (const c of row) for (const p of c.paragraphs) output.push(...prose(p.text, p.location, doc.fileName, meta));
+        for (const c of row) for (const p of c.paragraphs) output.push(...prose(p.text, p.location, doc.fileName, tableMeta));
         return;
       }
       const labels = row
@@ -443,8 +447,9 @@ export function extractWord(doc: WordDocument): Candidate[] {
             u,
             row.map((x) => x.text).join(' | '),
             {
-              asOf: meta.asOf,
-              scenario: metadata(header).scenario || meta.scenario,
+              asOf: tableMeta.asOf,
+              scenario: metadata(header).scenario || tableMeta.scenario,
+              evidence: tableMeta.evidence,
             },
             periodOf(
               header,
@@ -467,5 +472,15 @@ export function extractWord(doc: WordDocument): Candidate[] {
       }
     });
   }
-  return output;
+  const refs = doc.blocks.flatMap((block) =>
+    block.kind === 'paragraph'
+      ? [{ source: 'DOCX' as const, fileName: doc.fileName, location: block.location, originalText: block.text }]
+      : block.rows.map((row, i) => ({
+          source: 'DOCX' as const,
+          fileName: doc.fileName,
+          location: `${block.location} · ${i + 1}행`,
+          originalText: row.map((c) => c.text).join(' | '),
+        })),
+  );
+  return [...output, ...allocationGoals(refs)];
 }
