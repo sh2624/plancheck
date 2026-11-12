@@ -69,6 +69,8 @@ PowerShell에서 `PLANCHECK_PREVIEW_URL`을 실제 Preview URL로 지정한 뒤 
 
 ## 현재 검증 범위
 
+사용자 요청 모델 gpt-4o-mini로 실제 연결과 합성 3유형 평가를 수행했다. 최신 결과는 [GPT-4o Mini 실험 보고서](gpt4o-preview-experiment.md)를 참고한다. 연결은 성공했지만 추출 품질은 Production 적용 수준으로 확인되지 않았다.
+
 아래 내용은 최초 준비 시점의 기록이다. 이후 실제 배포와 HTTP 점검 결과는 [Preview 배포 점검](preview-deployment-check.md)을 참고한다. 실제 AI 요청은 모델 접근 거부로 실패했으며 성공으로 처리하지 않는다.
 
 실제 Preview 배포 주소가 아직 없어 네트워크 API 실험은 수행하지 않았다. 실제 호출 0회, 비용 $0, 지연시간·AI 검출률은 미측정이다. 모의 응답 테스트는 출처 검증·동의·실패 복구만 검증하며 AI의 문맥 이해 성능을 증명하지 않는다. 실제 문서 원본은 외부로 보내지 않았다.
