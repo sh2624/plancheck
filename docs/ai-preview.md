@@ -39,7 +39,7 @@ npx.cmd vercel deploy --environment=preview
 
 ### 현재 ALLOC·PLAN 연결 범위
 
-AI의 allocation 제안은 대상 ID·금액·기간이 비어 있는 배정 행 하나로 들어간다. 여러 배정의 자동 분할·연결은 없다. conditional_fund는 근거가 하나일 때만 원문 금액·단위를 옮기고 승인/수령/반영처는 미확인이다. action_conflict는 근거별 계획 행을 추가하지만 대상 ID·제안/실행 구분·행동·기간은 미확인으로 남긴다.
+AI의 allocation 제안은 대상 ID·금액·기간이 비어 있는 배정 행 하나로 들어간다. 여러 배정의 자동 분할·연결은 없다. conditional_fund는 명시적으로 같은 대상의 근거가 모두 같은 금액을 가리킬 때만 원본 금액·단위를 보존한다. 승인/수령/반영처는 미확인이다. action_conflict는 근거별 계획 행을 추가하고 검증된 행동·금액을 보존하지만 대상 ID·제안/실행 구분·기간·사용자 확인은 미확인으로 남긴다.
 
 따라서 현재 연결은 **기존 편집기를 통한 수동 확인 경로**이며 AI 추출만으로 ALLOC·PLAN 최종 판정까지 정확히 자동 연결된다고 볼 수 없다. Preview에서는 각 제안을 가져온 뒤 대상·금액·기간·시나리오·상태를 채워 확인하고 엔진 결과와 원본 위치를 대조한다. 동작을 확인하지 못한 단계는 성공 처리하지 않는다.
 
@@ -68,6 +68,8 @@ PowerShell에서 `PLANCHECK_PREVIEW_URL`을 실제 Preview URL로 지정한 뒤 
 - [Vercel Node 런타임](https://vercel.com/docs/functions/runtimes/node-js): 루트 `api`의 Web Request/Response 핸들러 사용. 추가 서버 유틸은 `server`에 두었다.
 
 ## 현재 검증 범위
+
+최신 로컬 수정과 실제 API 24호출 진단은 [실패 원인 분석](ai-context-failure-diagnosis.md)에 정리했다. 표기 대조는 개선했지만 기존 규칙 대비 실사용 우위는 입증되지 않았다. 해당 수정은 원격 push와 Production 적용을 하지 않았다.
 
 사용자 요청 모델 gpt-4o-mini로 실제 연결과 합성 3유형 평가를 수행했다. 최신 결과는 [GPT-4o Mini 실험 보고서](gpt4o-preview-experiment.md)를 참고한다. 연결은 성공했지만 추출 품질은 Production 적용 수준으로 확인되지 않았다.
 

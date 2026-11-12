@@ -1,6 +1,6 @@
 # PlanCheck
 
-선택형 AI 문맥 분석은 기본 비활성인 Vercel Preview 실험입니다. 서버 환경변수·선택 전송 범위·비용 제한·합성 자료 평가 방법은 [Preview 실험 안내](docs/ai-preview.md)를 참고하세요. API 키 없이 기존 규칙 기반 검사를 사용할 수 있습니다.
+선택형 AI 문맥 분석은 기본 비활성인 Vercel Preview 실험입니다. 서버 환경변수·선택 전송 범위·비용 제한·합성 자료 평가 방법은 [Preview 실험 안내](docs/ai-preview.md)를 참고하세요. [실제 실패 진단](docs/ai-context-failure-diagnosis.md)에서 표기 대조 개선과 남은 오탐·엔진 연결 한계를 구분했습니다. API 키 없이 기존 규칙 기반 검사를 사용할 수 있습니다.
 
 Excel 재무표와 Word 보고서를 등록하면 숫자 차이와 계획의 확인 후보를 자동으로 찾는 재무설계 문서 검사기입니다. 자동 발견과 사용자 확인 후 확정 검증을 구분하며, CALC·CROSS·ALLOC·PLAN 엔진을 재사용합니다. 자동 재무상담이나 재무설계 생성은 수행하지 않습니다.
 
