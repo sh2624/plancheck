@@ -1,9 +1,13 @@
 # Upload only the application and its build configuration.
 /*
 !src/
+!src/**
 !server/
+!server/**
 !api/
+!api/**
 !public/
+!public/**
 !index.html
 !package.json
 !package-lock.json
