@@ -1,5 +1,7 @@
 # PlanCheck
 
+최종 결과 화면의 요약·맞춤형 질문·응답 상태와 실제 Chrome 스크린샷은 [결과 UX 정리](docs/results-ux-final.md)를 참고하세요. 기본 목록에서는 핵심 값과 한 문장 질문을 보고, ‘이 항목 검토’에서 응답하며 원문·계산식은 ‘판단 근거 보기’로 확인합니다.
+
 최신 사용 흐름은 [검사 시작 UX](docs/inspection-start-ux.md)를 참고하세요. 파일 두 개를 등록하고 ‘검사 시작’을 한 번 누르면 항목별 사전 승인 없이 검사합니다. 규칙 기반 복합 관계 추출의 범위·성능·남은 확인 조건은 [최종 통합 평가](docs/final-integration-evaluation.md)에 정리했습니다. 로컬 검증본이며 배포 완료를 뜻하지 않습니다.
 
 팀원 피드백 반영본의 실제 파일·배포 검증 결과와 Production 반영 절차는 [전달본 안내](docs/team-feedback-release.md)에 정리했습니다. Production에서는 AI 실험 화면을 빌드 단계에서 차단합니다.
