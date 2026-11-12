@@ -32,6 +32,8 @@ import { validatePlanning } from './planning/engine';
 import { presentResult } from './presentation/results';
 import { inspectDocuments } from './inspection/analyze';
 import { InspectionResults } from './components/InspectionResults';
+import { AiContextPanel } from './components/AiContextPanel';
+import { importProposal } from './ai/import';
 import { assessRelationship } from './normalization/relationships';
 import {
   applyInlineReview,
@@ -540,6 +542,15 @@ export default function App() {
               onPlan={openPlan}
               onStart={() => setStep('raw')}
             />
+            {import.meta.env.VITE_ENABLE_AI_CONTEXT === 'true' && (
+              <AiContextPanel
+                key={JSON.stringify([sourceReferences, review.items])}
+                references={sourceReferences}
+                onImport={(proposal, refs) =>
+                  setPlanning((previous) => importProposal(previous, proposal, refs, `ai-${Date.now()}-${revision.current++}`))
+                }
+              />
+            )}
             <details className="advanced-workspace" open={advancedOpen} onToggle={(e) => setAdvancedOpen(e.currentTarget.open)}>
               <summary>고급 검사 설정·승인 결과</summary>
               <ResultsView
