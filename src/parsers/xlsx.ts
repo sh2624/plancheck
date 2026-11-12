@@ -1,5 +1,6 @@
 import { attr, children, content, descendants, openPackage, resolvePart } from './package';
 import type { Workbook, Cell } from './types';
+import { isDateTimeFormat } from './numberFormat';
 /** 시트별 실제 셀, 수식과 저장된 계산값을 추출하며 재계산하지 않는다. */
 export async function parseXlsx(data: ArrayBuffer, fileName: string): Promise<Workbook> {
   const read = await openPackage(data);
@@ -15,10 +16,12 @@ export async function parseXlsx(data: ArrayBuffer, fileName: string): Promise<Wo
     ['10', '0.00%'],
   ]);
   let cellFormats: string[] = [];
+  let formatIds: number[] = [];
   if (stylesRel) {
     const styles = await read(resolvePart('xl', attr(stylesRel, 'Target')!));
     for (const format of descendants(styles, 'numFmt')) formats.set(attr(format, 'numFmtId')!, attr(format, 'formatCode') ?? '');
     const xfs = descendants(styles, 'cellXfs')[0];
+    formatIds = xfs ? children(xfs, 'xf').map((xf) => Number(attr(xf, 'numFmtId') ?? 0)) : [];
     cellFormats = xfs ? children(xfs, 'xf').map((xf) => formats.get(attr(xf, 'numFmtId') ?? '') ?? '') : [];
   }
   const sheets: Workbook['sheets'] = [];
@@ -42,6 +45,8 @@ export async function parseXlsx(data: ArrayBuffer, fileName: string): Promise<Wo
         value,
         type,
         numberFormat: cellFormats[Number(attr(c, 's') ?? 0)],
+        numberFormatId: formatIds[Number(attr(c, 's') ?? 0)],
+        isDateTime: type === 'd' || isDateTimeFormat(formatIds[Number(attr(c, 's') ?? 0)], cellFormats[Number(attr(c, 's') ?? 0)]),
         formula: f ? content(f) || `[공유 수식 ${attr(f, 'si') ?? ''}: 원본 참조 필요]` : undefined,
         result: f && v && raw !== '' ? value : undefined,
         review: missingSharedValue || (!!f && (!v || raw === '' || type === 'e')) || type === 'e',

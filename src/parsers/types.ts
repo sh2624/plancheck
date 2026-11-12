@@ -7,6 +7,8 @@
   review: boolean;
   type: string;
   numberFormat?: string;
+  numberFormatId?: number;
+  isDateTime?: boolean;
 };
 export type Workbook = {
   fileName: string;

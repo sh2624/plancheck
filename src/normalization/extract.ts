@@ -1,6 +1,7 @@
 ﻿import type { Workbook, WordDocument } from '../parsers/types';
 import type { Candidate, Field, Unit } from './types';
 import { classify, normalize, unitOf } from './values';
+import { isDateTimeFormat } from '../parsers/numberFormat';
 import { declaredUnits, isHeader, isDateText, resolveUnit, periodOf, type UnitHint } from './unitContext';
 const numeric = /^[+-]?(?:\d[\d,]*(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?\s*(?:억\s*원|만\s*원|원|%|개월|년)?$/i;
 const token = /[+-]?\d[\d,]*(?:\.\d+)?(?:e[+-]?\d+)?/i;
@@ -61,6 +62,8 @@ function rowNumber(address: string) {
   return Number(address.match(/\d+/)?.[0] ?? 0);
 }
 const columnIndex = (s: string) => [...s].reduce((n, c) => n * 26 + c.charCodeAt(0) - 64, 0);
+const temporalCell = (c: Workbook['sheets'][number]['cells'][number]) =>
+  c.type === 'd' || c.isDateTime || isDateText(c.value) || isDateTimeFormat(c.numberFormatId, c.numberFormat);
 /** 숫자와 항목명이 같은 행에 있는 셀을 열 제목·명시 단위와 함께 후보화한다. */
 export function extractWorkbook(book: Workbook): Candidate[] {
   const output: Candidate[] = [];
@@ -152,14 +155,11 @@ export function extractWorkbook(book: Workbook): Candidate[] {
           : undefined;
         continue;
       }
-      const firstNumeric = cells.findIndex(
-        (c) =>
-          numeric.test(c.value.trim()) && c.type !== 'd' && !isDateText(c.value) && !/yyyy|yy|dd|m\/d|d\/m/i.test(c.numberFormat ?? ''),
-      );
+      const firstNumeric = cells.findIndex((c) => numeric.test(c.value.trim()) && !temporalCell(c));
       headerPending = false;
       const labels = cells
         .slice(0, firstNumeric < 0 ? cells.length : firstNumeric)
-        .filter((c) => c.value.trim() && !numeric.test(c.value.trim()));
+        .filter((c) => c.value.trim() && !numeric.test(c.value.trim()) && !temporalCell(c));
       const label = labels.map((c) => c.value).join(' · ');
       const field =
         classify(label) ??
@@ -169,12 +169,7 @@ export function extractWorkbook(book: Workbook): Candidate[] {
       let emitted = false;
       for (const c of values) {
         const header = headers.get(column(c.address)) ?? '';
-        if (
-          /대비|비율|비중|비고|상태|확정|기준일|일자|날짜/.test(header) ||
-          c.type === 'd' ||
-          /yyyy|yy|dd|m\/d|d\/m/i.test(c.numberFormat ?? '')
-        )
-          continue;
+        if (/대비|비율|비중|비고|상태|확정|기준일|일자|날짜/.test(header) || temporalCell(c)) continue;
         const valueField = field ?? classify(header);
         if (!valueField) continue;
         const valueLabel = field ? label : `${label} · ${header}`;
