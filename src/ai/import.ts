@@ -1,6 +1,6 @@
 import type { Proposal } from './contract';
 import type { EvidenceRef } from '../validation/types';
-import type { Planning } from '../planning/types';
+import type { Planning, PlanAction } from '../planning/types';
 import { newRecord } from '../planning/types';
 import { units, type Unit } from '../normalization/types';
 /** 기존 단위에 대응하는 원문 숫자만 편집 후보로 옮긴다. */
@@ -11,7 +11,11 @@ function amount(e: Proposal['evidence'][number]) {
 /** AI 관계는 대상 ID·기간·승인을 비워 둔 확인 후보로만 기존 편집기에 전달한다. */
 export function importProposal(planning: Planning, proposal: Proposal, references: EvidenceRef[], id: string): Planning {
   const base = {
-    label: proposal.evidence.map((e) => e.target).join(' / '),
+    label:
+      proposal.evidence
+        .map((e) => e.target)
+        .filter(Boolean)
+        .join(' / ') || '대상 확인 필요',
     confirmed: false,
     references,
     note: `AI 문맥 제안 — ${proposal.uncertainty}`,
@@ -31,7 +35,13 @@ export function importProposal(planning: Planning, proposal: Proposal, reference
     ...planning,
     actions: [
       ...planning.actions,
-      ...proposal.evidence.map((e, i) => ({ ...newRecord('action', `${id}-${i}`), ...base, label: e.target })),
+      ...proposal.evidence.map<PlanAction>((e, i) => ({
+        ...newRecord('action', `${id}-${i}`),
+        ...base,
+        ...amount(e),
+        label: e.target ?? '대상 확인 필요',
+        action: (e.action as '유지' | '중단' | '시작' | '증액' | '감액' | null) ?? '미확인',
+      })),
     ],
   };
 }

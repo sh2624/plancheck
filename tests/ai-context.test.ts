@@ -121,6 +121,6 @@ describe('AI 문맥 실험 안전장치', () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows.every((r) => !r.confirmed && !r.candidateIds.length)).toBe(true);
     expect(planning.allocations.every((r) => !r.assetId && !r.start)).toBe(true);
-    expect(planning.actions.every((r) => !r.targetId && r.action === '미확인')).toBe(true);
+    expect(planning.actions.every((r) => !r.targetId && r.action === '중단' && r.amount === '17')).toBe(true);
   });
 });

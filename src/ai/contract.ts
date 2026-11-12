@@ -1,3 +1,4 @@
+import { entityTarget, originalAmount, originalSpan, reject } from './provenance.js';
 export type ContextSource = { id: string; text: string };
 export const kinds = ['allocation', 'conditional_fund', 'action_conflict'] as const;
 export type Proposal = {
@@ -5,7 +6,7 @@ export type Proposal = {
   evidence: {
     sourceId: string;
     quote: string;
-    target: string;
+    target: string | null;
     number: string | null;
     unit: string | null;
     action: string | null;
@@ -50,7 +51,8 @@ export function readRequest(value: unknown): ContextSource[] {
 export function readProposals(value: unknown, sources: ContextSource[]): Proposal[] {
   if (!object(value) || !keys(value, ['proposals']) || !Array.isArray(value.proposals) || value.proposals.length > 12)
     throw new Error('INVALID_OUTPUT');
-  return value.proposals.map((p: unknown) => {
+  return value.proposals.map((p: unknown, proposalIndex: number) => {
+    const path = `proposals[${proposalIndex}]`;
     if (
       !object(p) ||
       !keys(p, ['kind', 'evidence', 'uncertainty', 'certainty']) ||
@@ -63,52 +65,58 @@ export function readProposals(value: unknown, sources: ContextSource[]): Proposa
       p.evidence.length > 8
     )
       throw new Error('INVALID_PROPOSAL');
-    const evidence = p.evidence.map((e: unknown) => {
+    const evidence = p.evidence.map((e: unknown, evidenceIndex: number) => {
+      const base = `${path}.evidence[${evidenceIndex}]`;
       if (
         !object(e) ||
         !keys(e, ['sourceId', 'quote', 'target', 'number', 'unit', 'action', 'timing']) ||
         typeof e.sourceId !== 'string' ||
         typeof e.quote !== 'string' ||
         !e.quote ||
-        typeof e.target !== 'string' ||
-        !e.target
+        (e.target !== null && typeof e.target !== 'string')
       )
         throw new Error('INVALID_EVIDENCE');
       const source = sources.find((s) => s.id === e.sourceId);
-      if (!source?.text.includes(e.quote) || !e.quote.includes(e.target)) throw new Error('UNSUPPORTED_SOURCE');
-      for (const field of ['number', 'unit', 'action', 'timing'])
-        if (e[field] !== null && (typeof e[field] !== 'string' || !e[field] || !e.quote.includes(e[field] as string)))
-          throw new Error('UNSUPPORTED_LITERAL');
-      if (
-        e.number !== null &&
-        (typeof e.number !== 'string' || ![...e.quote.matchAll(/-?\d[\d,]*(?:\.\d+)?/g)].some((m) => m[0] === e.number))
-      )
-        throw new Error('UNSUPPORTED_NUMBER');
-      if (
-        (e.number === null) !== (e.unit === null) ||
-        (e.unit !== null && !['원', '만원', '만 원', '억원', '억 원', '%', '개월', '년'].includes(e.unit as string))
-      )
-        throw new Error('INVALID_UNIT');
-      if (typeof e.number === 'string' && typeof e.unit === 'string') {
-        const compact = e.quote.replace(/\s/g, '');
-        const literal = `${e.number}${e.unit.replace(/\s/g, '')}`;
-        const index = compact.indexOf(literal);
-        if (
-          index < 0 ||
-          (index > 0 && /[\d,.]/.test(compact[index - 1])) ||
-          ![...source.text.matchAll(/-?\d[\d,]*(?:\.\d+)?/g)].some((m) => m[0] === e.number)
-        )
-          throw new Error('UNSUPPORTED_AMOUNT_UNIT');
+      if (!source) reject(`${base}.sourceId`, 'UNSUPPORTED_SOURCE', 'source');
+      const quote = originalSpan(source.text, e.quote);
+      if (!quote) reject(`${base}.quote`, 'UNSUPPORTED_SOURCE', 'source');
+      const target = e.target === null ? null : originalSpan(quote, e.target);
+      if (e.target !== null && !entityTarget(e.target)) reject(`${base}.target`, 'TARGET_NOT_ENTITY', 'target');
+      if (e.target !== null && !target) reject(`${base}.target`, 'UNSUPPORTED_SOURCE', 'target');
+      const absent = (value: unknown) => (value === 'null' ? null : value);
+      const number = absent(e.number),
+        unit = absent(e.unit),
+        action = absent(e.action),
+        timing = absent(e.timing);
+      let amount: { number: string; unit: string } | null = null;
+      if (number !== null || unit !== null) {
+        if (typeof number !== 'string' || typeof unit !== 'string') reject(`${base}.number`, 'INVALID_UNIT', 'amount');
+        amount = originalAmount(number, unit, quote);
+        if (!amount) reject(`${base}.number`, 'UNSUPPORTED_AMOUNT_UNIT', 'amount');
+      }
+      for (const [field, value] of [
+        ['action', action],
+        ['timing', timing],
+      ] as const) {
+        if (value !== null && (typeof value !== 'string' || !originalSpan(quote, value)))
+          reject(`${base}.${field}`, 'UNSUPPORTED_LITERAL', field);
       }
       if (
-        e.action !== null &&
-        (!['유지', '중단', '시작', '증액', '감액'].includes(e.action as string) || /하지|않|말고|말아/.test(e.quote))
+        action !== null &&
+        (!['유지', '중단', '시작', '증액', '감액'].includes(action as string) ||
+          /하지|않|말고|말아/.test(quote) ||
+          ['유지', '중단', '시작', '증액', '감액'].filter((a) => quote.includes(a)).length !== 1)
       )
-        throw new Error('AMBIGUOUS_ACTION');
-      const quote = e.quote;
-      if (e.action !== null && ['유지', '중단', '시작', '증액', '감액'].filter((a) => quote.includes(a)).length !== 1)
-        throw new Error('AMBIGUOUS_ACTION');
-      return e as Proposal['evidence'][number];
+        reject(`${base}.action`, 'AMBIGUOUS_ACTION', 'action');
+      return {
+        sourceId: e.sourceId,
+        quote,
+        target,
+        number: amount?.number ?? null,
+        unit: amount?.unit ?? null,
+        action: action as string | null,
+        timing: timing === null ? null : originalSpan(quote, timing as string),
+      };
     });
     return { kind: p.kind as Proposal['kind'], evidence, uncertainty: p.uncertainty, certainty: p.certainty as Proposal['certainty'] };
   });
@@ -138,9 +146,17 @@ export const outputSchema = {
               properties: {
                 sourceId: { type: 'string' },
                 quote: { type: 'string' },
-                target: { type: 'string' },
-                number: nullable,
-                unit: nullable,
+                target: {
+                  type: ['string', 'null'],
+                  description:
+                    'Exact asset, product or benefit name in this quote, never an amount, currency unit or goal. Null if absent.',
+                },
+                number: {
+                  type: ['string', 'null'],
+                  pattern: '^-?(?:\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.\\d+)?$',
+                  description: 'Digits only, without unit. Use JSON null if absent.',
+                },
+                unit: { type: ['string', 'null'], enum: ['원', '만원', '만 원', '억원', '억 원', '%', '개월', '년', null] },
                 action: { type: ['string', 'null'], enum: ['유지', '중단', '시작', '증액', '감액', null] },
                 timing: nullable,
               },
