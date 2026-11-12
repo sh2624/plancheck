@@ -87,6 +87,25 @@ export function InspectionResults(props: Props) {
     const r = f.approved ?? f.result,
       section = findingSection(f),
       entry = qualityMap.get(f.id)!;
+    // 이미 생성된 비교 중 동일 원본과 재계산값을 뒷받침하는 근거만 함께 표시한다.
+    const comparison =
+      f.kind === 'CALC' && !f.approved && r.expected !== null
+        ? findings.find(
+            (other) =>
+              other.kind === 'CROSS' &&
+              !other.approved &&
+              !other.relationship?.blocked &&
+              !contextMismatch(other) &&
+              !['different', 'unknown'].includes(other.decision?.choice ?? '') &&
+              other.signal === '수치 차이' &&
+              other.result.evidence.length === 2 &&
+              other.result.evidence.some((c) => c.id === r.evidence[0]?.id) &&
+              other.result.evidence.every((c) => c.field === r.evidence[0]?.field) &&
+              other.result.evidence.some((c) => c.id !== r.evidence[0]?.id && c.normalizedValue === r.expected),
+          )
+        : undefined;
+    const valueEvidence = comparison?.result.evidence ?? r.evidence;
+    const proofEvidence = [...new Map([...r.evidence, ...(comparison?.result.evidence ?? [])].map((c) => [c.id, c])).values()];
     const status =
       f.decision?.choice === 'different'
         ? '비교 기준 다름 · 추가 정보 필요'
@@ -124,7 +143,7 @@ export function InspectionResults(props: Props) {
           </span>
         </div>
         <div className="finding-values">
-          {r.evidence.slice(0, f.kind === 'CROSS' ? 2 : 4).map((c) => (
+          {valueEvidence.slice(0, f.kind === 'CROSS' || comparison ? 2 : 4).map((c) => (
             <p key={c.id}>
               <span>
                 {c.source === 'XLSX' ? 'Excel' : 'Word'} · {c.label}
@@ -208,7 +227,8 @@ export function InspectionResults(props: Props) {
             </p>
           )}
           <p className="pre">{r.basis}</p>
-          {r.evidence.map((c) => (
+          {comparison && <p className="pre">문서 간 비교 근거: {comparison.result.basis}</p>}
+          {proofEvidence.map((c) => (
             <div className="finding-evidence" key={c.id}>
               <strong>
                 {c.source} · {c.fileName} · {c.location}
