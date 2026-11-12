@@ -7,6 +7,7 @@ import type { ReviewChoice, InlineAnswers } from '../inspection/review';
 import { groupFindings, findingSection, resultSections, type ReviewedFinding } from '../presentation/findingGroups';
 import { formatFinancial } from '../presentation/format';
 import { groupDiscoveries } from '../presentation/discoveries';
+import { compoundReview } from '../presentation/compoundReview';
 import { candidateValue } from '../presentation/workflow';
 import { RecommendationDetail } from './RecommendationCenter';
 import { InlineReview } from './InlineReview';
@@ -49,7 +50,7 @@ function explanation(f: ReviewedFinding) {
     ? f.signal === '수치 차이'
       ? '두 값의 대상과 비교 기준이 같은지 확인해 주세요.'
       : '숫자만으로 동일 항목을 확정하지 않습니다. 관계와 적용 기준을 확인해 주세요.'
-    : '추천된 구성과 원문 조건을 바탕으로 한 후보입니다. 필요한 범위와 조건을 확인해 주세요.';
+    : '계산에 포함된 항목과 적용 조건을 확인해 주세요.';
 }
 /** 독립적인 우선 발견을 먼저 보여주고 추가·파생·보류 기록도 근거별로 유지한다. */
 export function InspectionResults(props: Props) {
@@ -57,6 +58,7 @@ export function InspectionResults(props: Props) {
   const [kind, setKind] = useState('전체'),
     [expandRelated, setExpandRelated] = useState(false),
     [selected, setSelected] = useState(''),
+    [lastReviewed, setLastReviewed] = useState(''),
     [complex, setComplex] = useState(false),
     [field, setField] = useState('전체'),
     [showAdditional, setShowAdditional] = useState(false),
@@ -64,6 +66,7 @@ export function InspectionResults(props: Props) {
     [followId, setFollowId] = useState(''),
     [openSupports, setOpenSupports] = useState<Record<string, boolean>>({});
   const detailRef = useRef<HTMLElement>(null),
+    feedbackRef = useRef<HTMLElement>(null),
     rootRef = useRef<HTMLElement>(null);
   useEffect(() => {
     if (selected) {
@@ -80,6 +83,15 @@ export function InspectionResults(props: Props) {
     followTier = visibleDiscoveries.find((d) => d.members.some((e) => e.occurrences.some((f) => f.id === followId)))?.representative.tier;
   const tierEntries = (tier: string) => representatives.filter((e) => e.tier === tier);
   const fields: string[] = [...new Set<string>(quality.map((e) => e.finding.result.evidence[0]?.field ?? 'planning'))];
+  const reviewed = findings.find((f) => f.id === lastReviewed && f.decision);
+  const reviewedSummary = reviewed ? compoundReview(reviewed, props.planning, props.references) : undefined;
+  const reviewedChoice = reviewed?.decision?.choice;
+  useEffect(() => {
+    if (lastReviewed && reviewedChoice) {
+      feedbackRef.current?.scrollIntoView?.({ block: 'nearest' });
+      feedbackRef.current?.focus();
+    }
+  }, [lastReviewed, reviewedChoice]);
   function close(id: string) {
     setSelected('');
     setFollowId(id);
@@ -93,6 +105,8 @@ export function InspectionResults(props: Props) {
     const r = f.approved ?? f.result,
       section = findingSection(f),
       entry = qualityMap.get(f.id)!;
+    const summary = compoundReview(f, props.planning, props.references);
+    const inlineCompound = !!summary && !!props.onPlanReview;
     const discovery = discoveries.find((d) => d.members.some((e) => e.finding === f));
     const supports = detailed ? [] : (discovery?.members.filter((e) => e.finding !== f) ?? []);
     const supportFollow = supports.some((e) => e.occurrences.some((record) => record.id === followId));
@@ -118,32 +132,49 @@ export function InspectionResults(props: Props) {
     const valueEvidence = comparison?.result.evidence ?? r.evidence;
     const proofEvidence = [...new Map([...r.evidence, ...(comparison?.result.evidence ?? [])].map((c) => [c.id, c])).values()];
     const status =
-      f.decision?.choice === 'different'
-        ? '비교 기준 다름 · 추가 정보 필요'
-        : f.decision?.choice === 'unknown'
-          ? '비교 기준 확인 필요'
-          : f.approved
-            ? statusLabels[f.approved.status]
-            : section === resultSections[3]
-              ? '추가 정보 필요'
-              : '검사 중 발견 · 확인 필요';
+      summary && f.decision
+        ? f.decision.choice === 'same'
+          ? '답변 기록 · 확인 필요'
+          : summary.kind === 'fund' && f.decision.choice === 'different'
+            ? '미확정 답변 · 추가 확인'
+            : '답변 보류 · 확인 필요'
+        : f.decision?.choice === 'different'
+          ? '비교 기준 다름 · 추가 정보 필요'
+          : f.decision?.choice === 'unknown'
+            ? '비교 기준 확인 필요'
+            : f.approved
+              ? statusLabels[f.approved.status]
+              : section === resultSections[3]
+                ? '추가 정보 필요'
+                : '검사 중 발견 · 확인 필요';
     return (
       <article
         className={detailed ? 'finding-support py-4 border-t' : 'finding'}
         data-finding={f.id}
+        data-review-kind={summary?.kind}
         data-tier={entry.tier}
         key={f.id}
         tabIndex={-1}
       >
         <div className="finding-heading">
           <h3>
-            {f.relationship?.blocked
-              ? '자동 연결에서 제외한 원본 기록'
-              : !f.approved && contextMismatch(f)
-                ? `${fieldLabels[r.evidence[0]?.field ?? 'unknown']} · 적용 기준이 다른 비교 기록`
-                : !f.approved && f.kind === 'PLAN'
-                  ? `${r.title.replace(/^(조건부 금액|제안·실행 비교|대응 계획 필요) · /, '')} — ${f.title}`
-                  : f.title}
+            {summary
+              ? summary.title
+              : comparison
+                ? `${r.title} 수치가 두 문서에서 다릅니다`
+                : !f.approved &&
+                    f.kind === 'CROSS' &&
+                    f.signal === '수치 차이' &&
+                    !contextMismatch(f) &&
+                    ['totalAssets', 'surplus'].includes(r.evidence[0]?.field ?? '')
+                  ? `${fieldLabels[r.evidence[0].field]} 수치가 두 문서에서 다릅니다`
+                  : f.relationship?.blocked
+                    ? '자동 연결에서 제외한 원본 기록'
+                    : !f.approved && contextMismatch(f)
+                      ? `${fieldLabels[r.evidence[0]?.field ?? 'unknown']} · 적용 기준이 다른 비교 기록`
+                      : !f.approved && f.kind === 'PLAN'
+                        ? `${r.title.replace(/^(조건부 금액|제안·실행 비교|대응 계획 필요) · /, '')} — ${f.title}`
+                        : f.title}
           </h3>
           <span
             className={
@@ -160,74 +191,53 @@ export function InspectionResults(props: Props) {
           </span>
         </div>
         <div className="finding-values">
-          {valueEvidence.slice(0, f.kind === 'CROSS' || comparison ? 2 : 4).map((c) => (
-            <p key={c.id}>
-              <span>
-                {c.source === 'XLSX' ? 'Excel' : 'Word'} · {c.label}
-              </span>
-              <strong>{candidateValue(c)}</strong>
-            </p>
-          ))}
+          {summary
+            ? summary.values.map((value, i) => (
+                <p key={i}>
+                  <span>{value.label}</span>
+                  <strong>{value.value}</strong>
+                </p>
+              ))
+            : valueEvidence.slice(0, f.kind === 'CROSS' || comparison ? 2 : 4).map((c) => (
+                <p key={c.id}>
+                  <span>
+                    {c.source === 'XLSX' ? 'Excel' : 'Word'} · {c.label}
+                  </span>
+                  <strong>{candidateValue(c)}</strong>
+                </p>
+              ))}
         </div>
-        {!r.evidence.length && (
+        {!summary && !r.evidence.length && (
           <p className="finding-comparison">
             {r.references?.[0]?.source === 'XLSX' ? 'Excel' : 'Word'} ·{' '}
             {r.actual === null ? '금액·관계 미확인' : `원문 금액 후보 ${formatFinancial(r.actual, r.unit)}`}
           </p>
         )}
-        {r.difference !== null && (!contextMismatch(f) || !!f.decision) && (
+        {!summary && r.difference !== null && (!contextMismatch(f) || !!f.decision) && (
           <p className="finding-comparison">
-            {f.kind === 'CROSS' ? '두 값의 차이' : f.kind === 'ALLOC' ? '같은 시점 사용 시 초과액' : '문서값과 계산값 차이'}:{' '}
+            {f.kind === 'CROSS' || comparison ? '두 값의 차이' : f.kind === 'ALLOC' ? '같은 시점 사용 시 초과액' : '문서값과 계산값 차이'}:{' '}
             <strong>{formatFinancial(Math.abs(r.difference), r.unit === '%' ? '%p' : r.unit, { difference: true })}</strong>
-            {f.kind === 'CALC' && <> · 재계산 {formatFinancial(r.expected, r.unit)}</>}
+            {f.kind === 'CALC' && !comparison && <> · 재계산 {formatFinancial(r.expected, r.unit)}</>}
           </p>
         )}
         <p className="finding-description">
-          {!f.decision && !f.approved && (f.relationship?.blocked || contextMismatch(f)) ? entry.reasons[0] : explanation(f)}
+          {summary
+            ? summary.meaning
+            : !f.decision && !f.approved && (f.relationship?.blocked || contextMismatch(f))
+              ? entry.reasons[0]
+              : explanation(f)}
         </p>
-        {r.reviewHint && (
-          <div className="finding-description">
-            <p>
-              <strong>{r.reviewHint.question}</strong>
-            </p>
-            {r.references?.map((ref, i) => (
-              <p key={i} className="pre break-words">
-                {ref.location} · {ref.originalText}
-              </p>
-            ))}
-            {props.onPlanReview && (
-              <>
-                <p>
-                  {f.decision?.choice === 'same'
-                    ? '원문 관계를 확인했습니다. 날짜·지급 조건 등 부족한 정보는 아직 확정되지 않았습니다.'
-                    : '이 답변은 관계 검토만 기록하며 금액·날짜·승인을 임의로 확정하지 않습니다.'}
-                </p>
-                <div className="finding-actions">
-                  {(
-                    [
-                      ['same', '예, 같은 관계입니다.'],
-                      ['different', '아니요, 다른 조건입니다.'],
-                      ['unknown', '확인할 수 없습니다.'],
-                    ] as const
-                  ).map(([choice, label]) => (
-                    <Button
-                      key={choice}
-                      variant="outline"
-                      aria-pressed={f.decision?.choice === choice}
-                      onClick={() => props.onPlanReview?.(f, choice)}
-                    >
-                      {label}
-                    </Button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
+        {summary && selected !== f.id && (
+          <p className="finding-question">
+            {f.decision?.choice === 'same' ? '관계 답변을 기록했습니다. 최종 판정에 필요한 조건을 확인하세요.' : summary.question}
+          </p>
         )}
         <div className="finding-actions">
           <Button
             onClick={() => {
-              if (f.relationship?.blocked) {
+              if (inlineCompound) {
+                setSelected(f.id);
+              } else if (f.relationship?.blocked) {
                 onInspect(r.evidence.map((c) => c.id));
               } else if (f.recommendation) {
                 setSelected(f.id);
@@ -238,7 +248,47 @@ export function InspectionResults(props: Props) {
             {f.relationship?.blocked ? '문서 내용 확인·수정' : f.approved ? '확인 내용 수정' : '이 항목 검토'}
           </Button>
         </div>
-        {selected === f.id && f.recommendation && (
+        {selected === f.id && summary && props.onPlanReview && (
+          <section ref={detailRef} tabIndex={-1} className="focused-review compound-review" aria-label="선택 항목 상세 검토">
+            <fieldset>
+              <legend>{summary.question}</legend>
+              <div className="compound-choices">
+                {(['same', 'different', 'unknown'] as const).map((choice) => (
+                  <Button
+                    key={choice}
+                    variant="outline"
+                    aria-pressed={f.decision?.choice === choice}
+                    onClick={() => {
+                      props.onPlanReview?.(f, choice);
+                      setLastReviewed(f.id);
+                      setSelected('');
+                    }}
+                  >
+                    {summary.choices[choice]}
+                  </Button>
+                ))}
+              </div>
+            </fieldset>
+            <p className="compound-review-note">
+              답변은 검토 상태만 기록합니다. 지급·수령·날짜 등 개별 정보나 최종 오류 판정을 자동 승인하지 않습니다.
+            </p>
+            <div className="finding-actions">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSelected('');
+                  props.onPrepare(r);
+                }}
+              >
+                상세 조건 확인·수정
+              </Button>
+              <Button variant="outline" onClick={() => close(f.id)}>
+                닫기
+              </Button>
+            </div>
+          </section>
+        )}
+        {selected === f.id && !inlineCompound && f.recommendation && (
           <section ref={detailRef} tabIndex={-1} className="focused-review" aria-label="선택 항목 상세 검토">
             {!complex && f.recommendation.link ? (
               <InlineReview
@@ -377,6 +427,21 @@ export function InspectionResults(props: Props) {
         <strong>확인된 오류 {discoveries.filter((d) => d.members.some((e) => e.finding.approved?.status === '오류')).length}</strong>
         <span>우선 확인할 문제 {discoveries.filter((d) => d.representative.tier === qualityTiers[0]).length}개</span>
       </div>
+      {reviewed && reviewedSummary && reviewed.decision && (
+        <aside ref={feedbackRef} tabIndex={-1} className="compound-feedback" role="status">
+          <strong>{reviewedSummary.title}</strong>
+          <p>{reviewedSummary.responses[reviewed.decision.choice]}</p>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setFollowId(reviewed.id);
+              setSelected(reviewed.id);
+            }}
+          >
+            이 답변 다시 검토
+          </Button>
+        </aside>
+      )}
       <div className="inspection-filters">
         <label>
           재무 항목

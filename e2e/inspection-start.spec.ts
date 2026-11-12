@@ -24,25 +24,32 @@ test('파일 준비 후 검사 시작 한 번으로 다섯 검토 대상을 표�
     priority = panel.locator('.quality-priority');
   await expect(priority).toContainText('20,000원');
   await expect(priority).toContainText('200,000원');
-  await expect(priority).toContainText('같은 예금의 배정액');
-  await expect(priority).toContainText('3,000,000원');
-  await expect(priority).toContainText('ETF 중단 제안과 유지 실행');
+  await expect(priority).toContainText('같은 예금을 두 목표에 사용했을 수 있습니다');
+  await expect(priority).toContainText('300만 원 부족');
+  await expect(priority).toContainText('ETF 적립 중단과 자동이체 유지 계획');
   await expect(priority).toContainText('월세 세액공제');
-  await expect(priority).toContainText('1,320,000원');
+  await expect(priority).toContainText('132만 원');
   await expect(panel).toContainText('확인된 오류 0');
   await expect(page.getByRole('region', { name: '데이터 확인', exact: true })).toHaveCount(0);
   await expect(page.getByText('선택형 AI 문맥 분석 · Preview 실험', { exact: true })).toHaveCount(0);
-  const action = priority.locator('.finding').filter({ has: page.getByRole('heading', { name: /ETF 중단 제안과 유지 실행/ }) });
-  await expect(action).toContainText('본문 문단 11');
-  await expect(action).toContainText('본문 문단 13');
-  await action.getByRole('button', { name: '예, 같은 관계입니다.', exact: true }).click();
-  await expect(action.getByRole('button', { name: '예, 같은 관계입니다.', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  const action = priority.locator('.finding[data-review-kind="action"]');
+  await expect(action).toContainText('4단계 · 제안');
+  await expect(action).toContainText('5단계 · 실행');
+  await action.getByText('판단 근거 보기', { exact: true }).click();
+  await expect(action.getByText(/본문 문단 11/)).toBeVisible();
+  await expect(action.getByText(/본문 문단 13/)).toBeVisible();
+  await action.getByText('판단 근거 보기', { exact: true }).click();
+  await action.getByRole('button', { name: '이 항목 검토', exact: true }).click();
+  await action.getByRole('button', { name: '예, 같은 ETF와 기간입니다.', exact: true }).click();
+  await action.getByRole('button', { name: '이 항목 검토', exact: true }).click();
+  await expect(action.getByRole('button', { name: '예, 같은 ETF와 기간입니다.', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(panel).toContainText('확인된 오류 0');
   await page.getByRole('button', { name: '2. 검사 결과', exact: true }).click();
-  await expect(action.getByRole('button', { name: '예, 같은 관계입니다.', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(action.getByRole('button', { name: '예, 같은 ETF와 기간입니다.', exact: true })).toHaveAttribute('aria-pressed', 'true');
   // 모르는 조건은 단 한 번의 답변으로 보류하며 확정 오류를 만들지 않는다.
-  for (const title of [/ETF 중단 제안과 유지 실행/, /같은 예금의 배정액/, /월세 세액공제 예상액/]) {
-    const card = priority.locator('.finding').filter({ has: page.getByRole('heading', { name: title }) });
+  for (const kind of ['action', 'allocation', 'fund']) {
+    const card = priority.locator(`.finding[data-review-kind="${kind}"]`);
+    if (kind !== 'action') await card.getByRole('button', { name: '이 항목 검토', exact: true }).click();
     await card.getByRole('button', { name: '확인할 수 없습니다.', exact: true }).click();
     await expect(card).toHaveCount(0);
     await expect(panel).toContainText('확인된 오류 0');
