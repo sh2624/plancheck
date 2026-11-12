@@ -1,0 +1,21 @@
+# Upload only the application and its build configuration.
+/*
+!src/
+!server/
+!api/
+!public/
+!index.html
+!package.json
+!package-lock.json
+!tsconfig*.json
+!vite.config.ts
+!vercel.json
+
+# Never upload private documents or credentials, including nested files.
+**/*.xlsx
+**/*.docx
+**/.env*
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx

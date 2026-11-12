@@ -16,6 +16,36 @@ Production에서는 두 활성화 값을 제거한다. 서버는 `VERCEL_ENV=pre
 
 ## 배포 후 확인 순서
 
+### 현재 커밋 배포 명령
+
+2026-11-12 점검 기준 기능 커밋은 `1a0caa8`이다. `plancheck.cloud/api/analyze-context`의 GET 요청은 www 도메인으로 이동한 뒤 404를 반환했다. 해당 도메인에서 신규 API가 실행된다는 근거는 아직 없다. GET이 정상 핸들러에 도달하면 인증 통과 후 `405 POST_REQUIRED`가 나와야 한다. 이 응답만으로 Preview 환경·키·외부 API 동작까지 확인되는 것은 아니다.
+
+Vercel 프로젝트에서 먼저 Preview 전용 환경변수 3개와 Deployment Protection의 Vercel Authentication을 설정한다. **보호된 Preview 생성 URL**이 인증 없이 접근되지 않는지 확인하기 전에는 실제 문서 분석을 실행하지 않는다. 코드에는 자체 인증·사용자별 호출 제한이 없고 Origin은 생략/위조할 수 있으므로 요청당 제한만으로 무제한 호출을 막지 못한다.
+
+CLI를 사용할 경우 아래 명령은 사용자가 직접 실행한다. `--prod`와 Production 승격은 사용하지 않는다. 기존 PlanCheck 프로젝트를 선택하고 Environment가 Preview인지 배포 상세에서 확인한다. Git의 main push는 프로젝트 설정에 따라 Production 배포를 유발할 수 있으므로 Preview 검증만을 위해 바로 실행하지 않는다.
+
+```powershell
+npm.cmd ci
+npm.cmd run build
+npx.cmd vercel login
+npx.cmd vercel link
+npx.cmd vercel deploy --environment=preview
+```
+
+`.vercelignore`는 앱과 빌드 설정만 업로드하도록 제한한다. 로컬의 docs·테스트 결과·금융 원본·환경변수 파일은 배포 소스에서 제외한다. CLI 로컬 배포에는 원격 Git push가 필요하지 않다.
+
+생성된 URL을 브라우저에서 로그인한 후 확인한다. 별도의 비로그인 환경에서 API 접근도 차단되어야 한다. 인증된 세션의 GET에는 405, 동의 없는 JSON POST에는 400이 기대된다. 404는 함수 배포/경로 문제, 503은 Preview·활성 플래그·서버 키 확인 대상이다. 실제 OpenAI 호출은 동의한 선택 문장으로만 실행한다. 문서 전송 없이 인증 확인만 먼저 한다.
+
+### 현재 ALLOC·PLAN 연결 범위
+
+AI의 allocation 제안은 대상 ID·금액·기간이 비어 있는 배정 행 하나로 들어간다. 여러 배정의 자동 분할·연결은 없다. conditional_fund는 근거가 하나일 때만 원문 금액·단위를 옮기고 승인/수령/반영처는 미확인이다. action_conflict는 근거별 계획 행을 추가하지만 대상 ID·제안/실행 구분·행동·기간은 미확인으로 남긴다.
+
+따라서 현재 연결은 **기존 편집기를 통한 수동 확인 경로**이며 AI 추출만으로 ALLOC·PLAN 최종 판정까지 정확히 자동 연결된다고 볼 수 없다. Preview에서는 각 제안을 가져온 뒤 대상·금액·기간·시나리오·상태를 채워 확인하고 엔진 결과와 원본 위치를 대조한다. 동작을 확인하지 못한 단계는 성공 처리하지 않는다.
+
+팀원 문서는 먼저 비식별 여부를 확인하고 필요한 문장만 선택한다. 지원금의 '미래 예상 시나리오'와 '현재 확정 자산 선반영'은 별개이며 미래 예상만 있으면 오류 미검출을 실패로 세지 않는다. 실제 원본의 추출 결과와 합성 오류 문장의 결과를 별도로 기록한다.
+
+참고: [Preview 배포 CLI](https://vercel.com/docs/cli/deploy), [배포 접근 보호](https://vercel.com/docs/deployment-protection), [배포 파일 제외](https://vercel.com/docs/deployments/vercel-ignore).
+
 1. 키·플래그가 없는 환경에서 기본 XLSX·DOCX 검사가 정상인지 확인한다.
 2. Preview에서 비식별 합성 문서를 업로드한다. 결과 아래 ‘선택형 AI 문맥 분석’을 펼친다.
 3. 선택된 문장 전체와 외부 전송 안내를 읽는다. 파일명은 전송하지 않지만 문장 자체에 개인정보가 있을 수 있으므로 실제 금융자료는 사용하지 않는다.
