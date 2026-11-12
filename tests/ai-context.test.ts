@@ -104,6 +104,15 @@ describe('AI 문맥 실험 안전장치', () => {
     expect((await analyzeContext(req, env, fetcher)).status).toBe(403);
     expect(fetcher).not.toHaveBeenCalled();
   });
+  it('상류 진단은 허용 코드만 반환하고 원문 메시지는 숨긴다', async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        Response.json({ error: { code: 'model_not_found', message: 'private raw document test-secret-not-real' } }, { status: 404 }),
+      );
+    const response = await analyzeContext(request(), env, fetcher);
+    expect(await response.json()).toEqual({ error: 'AI_UNAVAILABLE', upstreamStatus: 404, reason: 'model_not_found' });
+  });
   it.each(['allocation', 'conditional_fund', 'action_conflict'] as const)('AI %s를 가져와도 승인·대상·시점은 확정하지 않음', (kind) => {
     const planning = importProposal(emptyPlanning(), { ...proposal, kind, certainty: 'confirmed' }, [], 'ai-test');
     const rows = [...planning.allocations, ...planning.funds, ...planning.actions];

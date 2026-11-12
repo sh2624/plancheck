@@ -57,7 +57,23 @@ export async function analyzeContext(request: Request, env: Env, fetcher: typeof
         text: { format: { type: 'json_schema', name: 'context_relations', strict: true, schema: outputSchema } },
       }),
     });
-    if (!response.ok) return reply(502, { error: 'AI_UNAVAILABLE' });
+    if (!response.ok) {
+      const failure = await response.json().catch(() => null);
+      const allowed = [
+        'model_not_found',
+        'invalid_api_key',
+        'insufficient_quota',
+        'rate_limit_exceeded',
+        'unsupported_parameter',
+        'invalid_value',
+      ];
+      const code = failure?.error?.code;
+      return reply(502, {
+        error: 'AI_UNAVAILABLE',
+        upstreamStatus: response.status,
+        reason: allowed.includes(code) ? code : 'UPSTREAM_REJECTED',
+      });
+    }
     const result = await response.json();
     if (result.status !== 'completed' || !Array.isArray(result.output)) return reply(502, { error: 'AI_INCOMPLETE' });
     const texts = result.output.flatMap((o: { content?: { type: string; text?: string }[] }) => o.content ?? []);
