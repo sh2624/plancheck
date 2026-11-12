@@ -1,7 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { feedbackWorkbook, feedbackWord } from '../tests/feedback-fixtures';
 test('Preview AI 모의 응답은 명시적 선택 후에만 호출하고 파일 교체 시 초기화한다', async ({ page }) => {
-  test.skip(process.env.VITE_ENABLE_AI_CONTEXT !== 'true', 'AI 실험 빌드에서만 실행');
+  test.skip(
+    process.env.VITE_ENABLE_AI_CONTEXT !== 'true' || process.env.VERCEL_ENV !== 'preview',
+    '명시적인 Preview AI 실험 빌드에서만 실행',
+  );
   let calls = 0;
   await page.route('**/api/analyze-context', async (route) => {
     calls++;
