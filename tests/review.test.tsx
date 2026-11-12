@@ -169,7 +169,7 @@ it('확인한 승인 연결만 결과에 표시하고 편집 후 오래된 판�
   openAdvancedResults();
   expect(screen.getByText('오류', { exact: true, selector: 'span' })).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: /CROSS_VALUE/ }));
-  fireEvent.click(screen.getByRole('button', { name: '문서 내용 확인·수정' }));
+  fireEvent.click(within(screen.getByRole('region', { name: '검증 근거 상세' })).getByRole('button', { name: '문서 내용 확인·수정' }));
   expect((screen.getByLabelText('목록 필터') as HTMLSelectElement).value).toBe('관련 항목');
   expect(screen.getAllByLabelText('숫자')).toHaveLength(2);
   const excelNumber = screen.getAllByLabelText('숫자').find((input) => input.closest('tr')?.textContent?.includes('XLSX'))!;

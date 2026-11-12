@@ -26,7 +26,7 @@ it.skipIf(!process.env.PLANCHECK_XLSX || !process.env.PLANCHECK_DOCX)(
     fireEvent.click(screen.getByText('추출 요약·원본 보기 · Word 보고서'));
     fireEvent.click(screen.getByText('원본 상세 보기 · Excel 재무표'));
     fireEvent.click(screen.getByText('원본 상세 보기 · Word 보고서'));
-    expect(screen.getAllByRole('option')).toHaveLength(5);
+    expect(within(screen.getByRole('region', { name: 'Excel 재무표' })).getAllByRole('option')).toHaveLength(5);
     const original = screen.getByRole('region', { name: 'Word 보고서' }).querySelector('.original-details')! as HTMLElement;
     expect(within(original).getAllByRole('heading', { level: 3 })).toHaveLength(10);
     expect(screen.queryByRole('alert')).toBeNull();

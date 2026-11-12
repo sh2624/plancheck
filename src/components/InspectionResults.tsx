@@ -35,6 +35,7 @@ type Props = InspectionInput & {
   onStart: () => void;
   onPrepare: (result: Result) => void;
   onInlineReview: (r: Recommendation, choice: ReviewChoice, answers: InlineAnswers) => string[];
+  onPlanReview?: (finding: ReviewedFinding, choice: ReviewChoice) => void;
 };
 function explanation(f: ReviewedFinding) {
   if (f.decision?.choice === 'different')
@@ -176,7 +177,7 @@ export function InspectionResults(props: Props) {
         )}
         {r.difference !== null && (!contextMismatch(f) || !!f.decision) && (
           <p className="finding-comparison">
-            {f.kind === 'CROSS' ? '두 값의 차이' : '문서값과 계산값 차이'}:{' '}
+            {f.kind === 'CROSS' ? '두 값의 차이' : f.kind === 'ALLOC' ? '같은 시점 사용 시 초과액' : '문서값과 계산값 차이'}:{' '}
             <strong>{formatFinancial(Math.abs(r.difference), r.unit === '%' ? '%p' : r.unit, { difference: true })}</strong>
             {f.kind === 'CALC' && <> · 재계산 {formatFinancial(r.expected, r.unit)}</>}
           </p>
@@ -184,6 +185,45 @@ export function InspectionResults(props: Props) {
         <p className="finding-description">
           {!f.decision && !f.approved && (f.relationship?.blocked || contextMismatch(f)) ? entry.reasons[0] : explanation(f)}
         </p>
+        {r.reviewHint && (
+          <div className="finding-description">
+            <p>
+              <strong>{r.reviewHint.question}</strong>
+            </p>
+            {r.references?.map((ref, i) => (
+              <p key={i} className="pre break-words">
+                {ref.location} · {ref.originalText}
+              </p>
+            ))}
+            {props.onPlanReview && (
+              <>
+                <p>
+                  {f.decision?.choice === 'same'
+                    ? '원문 관계를 확인했습니다. 날짜·지급 조건 등 부족한 정보는 아직 확정되지 않았습니다.'
+                    : '이 답변은 관계 검토만 기록하며 금액·날짜·승인을 임의로 확정하지 않습니다.'}
+                </p>
+                <div className="finding-actions">
+                  {(
+                    [
+                      ['same', '예, 같은 관계입니다.'],
+                      ['different', '아니요, 다른 조건입니다.'],
+                      ['unknown', '확인할 수 없습니다.'],
+                    ] as const
+                  ).map(([choice, label]) => (
+                    <Button
+                      key={choice}
+                      variant="outline"
+                      aria-pressed={f.decision?.choice === choice}
+                      onClick={() => props.onPlanReview?.(f, choice)}
+                    >
+                      {label}
+                    </Button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
         <div className="finding-actions">
           <Button
             onClick={() => {

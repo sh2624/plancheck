@@ -5,6 +5,21 @@ import type { Recommendation } from '../recommendations/types';
 import { loanIdentity } from '../recommendations/recommend';
 import { assessRelationship } from '../normalization/relationships';
 import type { Finding } from './analyze';
+import type { Planning } from '../planning/types';
+import type { EvidenceRef } from '../validation/types';
+/** 같은 원문 관계에 대한 답변만 재사용하고 관련 계획·근거가 바뀌면 무효화한다. */
+export function planReviewFingerprint(planning: Planning, refs: EvidenceRef[]) {
+  const key = (r: EvidenceRef) => JSON.stringify([r.source, r.fileName, r.location, r.originalText]);
+  const keys = new Set(refs.map(key));
+  const related = (row: { references: EvidenceRef[] }) => row.references.some((r) => keys.has(key(r)));
+  return JSON.stringify([
+    refs.map(key).sort(),
+    planning.asOf,
+    planning.allocations.filter(related),
+    planning.funds.filter(related),
+    planning.actions.filter(related),
+  ]);
+}
 export type ReviewChoice = 'same' | 'different' | 'unknown';
 export type InlineAnswers = {
   asOf?: string;
@@ -14,6 +29,7 @@ export type InlineAnswers = {
   units?: Record<string, Candidate['unit']>;
 };
 export type ReviewDecision = {
+  planningFingerprint?: string;
   choice: ReviewChoice;
   candidateIds: string[];
   fingerprint: string;

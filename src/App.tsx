@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { FileCheck2 } from 'lucide-react';
 import { DocumentPanel } from './components/DocumentPanel';
 import { WorkbookView } from './components/WorkbookView';
@@ -38,6 +38,7 @@ import { assessRelationship } from './normalization/relationships';
 import {
   applyInlineReview,
   reviewFingerprint,
+  planReviewFingerprint,
   removeDecisions,
   type ReviewDecision,
   type ReviewChoice,
@@ -53,7 +54,10 @@ export default function App() {
     results: true,
   });
   const [registered, setRegistered] = useState({ XLSX: false, DOCX: false });
-  const [inspectionStarted, setInspectionStarted] = useState(false);
+  const inspectionStarted = registered.XLSX && registered.DOCX;
+  useEffect(() => {
+    if (inspectionStarted) document.querySelector<HTMLElement>('[aria-label="자동 검사 결과"]')?.scrollIntoView?.({ block: 'start' });
+  }, [inspectionStarted]);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [inlineDecisions, setInlineDecisions] = useState<Record<string, ReviewDecision>>({});
   const [focusIds, setFocusIds] = useState<string[]>([]);
@@ -91,6 +95,7 @@ export default function App() {
     () =>
       inspectionStarted
         ? inspectDocuments({
+            compoundDiscovery: import.meta.env.VITE_ENABLE_COMPOUND_DISCOVERY !== 'false',
             items: review.items,
             links: review.links,
             calculations,
@@ -100,7 +105,13 @@ export default function App() {
             const decision = inlineDecisions[f.id];
             return {
               ...f,
-              decision: decision && decision.fingerprint === reviewFingerprint(review.items, decision.candidateIds) ? decision : undefined,
+              decision:
+                decision &&
+                decision.fingerprint === reviewFingerprint(review.items, decision.candidateIds) &&
+                (!decision.planningFingerprint ||
+                  decision.planningFingerprint === planReviewFingerprint(planning, f.result.references ?? []))
+                  ? decision
+                  : undefined,
             };
           })
         : [],
@@ -266,7 +277,7 @@ export default function App() {
   }
   function replaceSource(source: Candidate['source'], next: Candidate[], references: EvidenceRef[] = [], fingerprint?: string) {
     revision.current++;
-    setInspectionStarted(false);
+    setAdvancedOpen(false);
     setInlineDecisions({});
     setDocuments((prev) => {
       const nextDocs = { ...prev };
@@ -494,7 +505,6 @@ export default function App() {
             <Button
               disabled={!registered.XLSX || !registered.DOCX}
               onClick={() => {
-                setInspectionStarted(true);
                 setStep('results');
                 setAdvancedOpen(false);
               }}
@@ -524,9 +534,22 @@ export default function App() {
             onConfirm={confirm}
           />
         )}
-        {step === 'results' && (
+        {(step === 'results' || (step === 'raw' && inspectionStarted)) && (
           <>
             <InspectionResults
+              onPlanReview={(finding, choice) => {
+                revision.current++;
+                const ids = finding.result.evidence.map((c) => c.id);
+                setInlineDecisions((previous) => ({
+                  ...previous,
+                  [finding.id]: {
+                    choice,
+                    candidateIds: ids,
+                    fingerprint: reviewFingerprint(review.items, ids),
+                    planningFingerprint: planReviewFingerprint(planning, finding.result.references ?? []),
+                  },
+                }));
+              }}
               onInlineReview={inlineReview}
               onPrepare={prepare}
               started={inspectionStarted}
