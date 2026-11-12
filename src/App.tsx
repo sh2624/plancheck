@@ -659,7 +659,7 @@ export default function App() {
           </>
         )}
       </main>
-      <footer>PlanCheck · 재무 문서 검수</footer>
+      <footer>PlanCheck | 재무 문서 검사기</footer>
     </>
   );
 }
