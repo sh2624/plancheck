@@ -1,20 +1,25 @@
-# Upload only the application and its build configuration.
-/*
-!src/
-!src/**
-!server/
-!server/**
-!api/
-!api/**
-!public/
-!public/**
-!index.html
-!package.json
-!package-lock.json
-!tsconfig*.json
-!vite.config.ts
-!vercel.json
-
+# Exclude private material and local artifacts from source deployments.
+.git/
+.vercel/
+.cache/
+.agents/
+.codex/
+.aws/
+.npm/
+.vscode/
+node_modules/
+dist/
+coverage/
+test-results/
+playwright-report/
+docs/
+tests/
+e2e/
+scripts/
+AGENTS.md
+.env*
+*.log
+*.tsbuildinfo
 # Never upload private documents or credentials, including nested files.
 **/*.xlsx
 **/*.docx

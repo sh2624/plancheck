@@ -1,4 +1,4 @@
-import { MAX_BYTES, outputSchema, readProposals, readRequest } from '../src/ai/contract.ts';
+import { MAX_BYTES, outputSchema, readProposals, readRequest } from '../src/ai/contract.js';
 type Env = Record<string, string | undefined>;
 const MODEL = 'gpt-5.6-terra';
 const OUTPUT_TOKENS = 1600;
