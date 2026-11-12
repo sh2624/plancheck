@@ -3,10 +3,21 @@ import type { EvidenceRef } from '../validation/types';
 import type { Planning, PlanAction } from '../planning/types';
 import { newRecord } from '../planning/types';
 import { units, type Unit } from '../normalization/types';
+import { normalize } from '../normalization/values';
 /** 기존 단위에 대응하는 원문 숫자만 편집 후보로 옮긴다. */
 function amount(e: Proposal['evidence'][number]) {
   const unit = e.unit?.replace('만원', '만 원').replace('억원', '억 원');
   return { amount: e.number ?? '', unit: units.includes(unit as Unit) ? (unit as Unit) : ('미확인' as const) };
+}
+/** 동일 대상의 여러 근거가 같은 금액을 가리킬 때만 값을 보존한다. 확인 상태는 바꾸지 않는다. */
+function corroboratedAmount(evidence: Proposal['evidence']) {
+  if (!evidence.length || evidence.some((e) => !e.target)) return {};
+  if (new Set(evidence.map((e) => e.target!.replace(/\s/g, ''))).size !== 1) return {};
+  const amounts = evidence.map(amount);
+  if (amounts.some((a) => !['원', '만 원', '억 원'].includes(a.unit))) return {};
+  const values = amounts.map((a) => normalize(a.amount, a.unit));
+  if (values.some((v) => v === null || !Number.isSafeInteger(v)) || new Set(values).size !== 1) return {};
+  return amounts[0];
 }
 /** AI 관계는 대상 ID·기간·승인을 비워 둔 확인 후보로만 기존 편집기에 전달한다. */
 export function importProposal(planning: Planning, proposal: Proposal, references: EvidenceRef[], id: string): Planning {
@@ -26,10 +37,7 @@ export function importProposal(planning: Planning, proposal: Proposal, reference
   if (proposal.kind === 'conditional_fund')
     return {
       ...planning,
-      funds: [
-        ...planning.funds,
-        { ...newRecord('fund', id), ...base, ...(proposal.evidence.length === 1 ? amount(proposal.evidence[0]) : {}) },
-      ],
+      funds: [...planning.funds, { ...newRecord('fund', id), ...base, ...corroboratedAmount(proposal.evidence) }],
     };
   return {
     ...planning,

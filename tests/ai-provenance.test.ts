@@ -12,6 +12,18 @@ const proposal: Proposal = {
   evidence: [{ sourceId: 's0', quote: sources[0].text, target: '별빛 지원금', number: '173', unit: '만 원', action: null, timing: null }],
 };
 describe('AI 출처의 안전한 표기 정규화', () => {
+  it('여러 출처의 같은 지원금 금액을 보존하고 다른 금액은 고르지 않는다', () => {
+    const evidence = [
+      { ...proposal.evidence[0], number: '173', unit: '만 원' },
+      { ...proposal.evidence[0], sourceId: 's1', number: '1,730,000', unit: '원' },
+    ];
+    const planning = importProposal(emptyPlanning(), { ...proposal, evidence }, [], 'same');
+    expect(planning.funds[0]).toMatchObject({ amount: '173', unit: '만 원', confirmed: false });
+    expect(
+      importProposal(emptyPlanning(), { ...proposal, evidence: [evidence[0], { ...evidence[1], number: '1,740,000' }] }, [], 'different')
+        .funds[0].amount,
+    ).toBe('');
+  });
   it('다른 문장의 같은 기간 참조는 날짜를 확정하지 않는다', () => {
     const timingSources = [
       { id: 's0', text: '2031-03-01부터 2031-03-31까지 별빛 예금 173만원을 배정한다.' },
