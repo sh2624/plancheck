@@ -6,6 +6,7 @@ import type { Result } from '../validation/types';
 import type { ReviewChoice, InlineAnswers } from '../inspection/review';
 import { groupFindings, findingSection, resultSections, type ReviewedFinding } from '../presentation/findingGroups';
 import { formatFinancial } from '../presentation/format';
+import { groupDiscoveries } from '../presentation/discoveries';
 import { candidateValue } from '../presentation/workflow';
 import { RecommendationDetail } from './RecommendationCenter';
 import { InlineReview } from './InlineReview';
@@ -59,7 +60,8 @@ export function InspectionResults(props: Props) {
     [field, setField] = useState('전체'),
     [showAdditional, setShowAdditional] = useState(false),
     [showRecords, setShowRecords] = useState(false),
-    [followId, setFollowId] = useState('');
+    [followId, setFollowId] = useState(''),
+    [openSupports, setOpenSupports] = useState<Record<string, boolean>>({});
   const detailRef = useRef<HTMLElement>(null),
     rootRef = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -69,40 +71,48 @@ export function InspectionResults(props: Props) {
     }
   }, [selected]);
   const quality = reviewQuality(findings),
+    discoveries = groupDiscoveries(quality),
+    visibleDiscoveries = discoveries.filter((d) => filterQuality(d.members, field, kind).length > 0),
+    representatives = visibleDiscoveries.map((d) => d.representative),
     filtered = filterQuality(quality, field, kind),
     qualityMap = new Map(quality.map((e) => [e.finding.id, e])),
-    followTier = quality.find((e) => e.occurrences.some((f) => f.id === followId))?.tier;
-  const tierEntries = (tier: string) => filtered.filter((e) => e.tier === tier);
+    followTier = visibleDiscoveries.find((d) => d.members.some((e) => e.occurrences.some((f) => f.id === followId)))?.representative.tier;
+  const tierEntries = (tier: string) => representatives.filter((e) => e.tier === tier);
   const fields: string[] = [...new Set<string>(quality.map((e) => e.finding.result.evidence[0]?.field ?? 'planning'))];
   function close(id: string) {
     setSelected('');
     setFollowId(id);
     requestAnimationFrame(() =>
-      Array.from(rootRef.current?.querySelectorAll<HTMLElement>('.finding') ?? [])
+      Array.from(rootRef.current?.querySelectorAll<HTMLElement>('.finding, .finding-support') ?? [])
         .find((el) => el.dataset.finding === id)
         ?.focus(),
     );
   }
-  function card(f: ReviewedFinding) {
+  function card(f: ReviewedFinding, detailed = false) {
     const r = f.approved ?? f.result,
       section = findingSection(f),
       entry = qualityMap.get(f.id)!;
-    // 이미 생성된 비교 중 동일 원본과 재계산값을 뒷받침하는 근거만 함께 표시한다.
+    const discovery = discoveries.find((d) => d.members.some((e) => e.finding === f));
+    const supports = detailed ? [] : (discovery?.members.filter((e) => e.finding !== f) ?? []);
+    const supportFollow = supports.some((e) => e.occurrences.some((record) => record.id === followId));
+    // 대표에 묶인 동일 원본 비교만 함께 보여준다. 다른 원본을 임의 선택하지 않는다.
     const comparison =
-      f.kind === 'CALC' && !f.approved && r.expected !== null
-        ? findings.find(
-            (other) =>
-              other.kind === 'CROSS' &&
-              !other.approved &&
-              !other.relationship?.blocked &&
-              !contextMismatch(other) &&
-              !['different', 'unknown'].includes(other.decision?.choice ?? '') &&
-              other.signal === '수치 차이' &&
-              other.result.evidence.length === 2 &&
-              other.result.evidence.some((c) => c.id === r.evidence[0]?.id) &&
-              other.result.evidence.every((c) => c.field === r.evidence[0]?.field) &&
-              other.result.evidence.some((c) => c.id !== r.evidence[0]?.id && c.normalizedValue === r.expected),
-          )
+      !detailed && f.kind === 'CALC' && !f.approved && r.expected !== null
+        ? discovery?.members
+            .map((e) => e.finding)
+            .find(
+              (other) =>
+                other.kind === 'CROSS' &&
+                !other.approved &&
+                !other.relationship?.blocked &&
+                !contextMismatch(other) &&
+                !['different', 'unknown'].includes(other.decision?.choice ?? '') &&
+                other.signal === '수치 차이' &&
+                other.result.evidence.length === 2 &&
+                other.result.evidence.some((c) => c.id === r.evidence[0]?.id) &&
+                other.result.evidence.every((c) => c.field === r.evidence[0]?.field) &&
+                other.result.evidence.some((c) => c.id !== r.evidence[0]?.id && c.normalizedValue === r.expected),
+            )
         : undefined;
     const valueEvidence = comparison?.result.evidence ?? r.evidence;
     const proofEvidence = [...new Map([...r.evidence, ...(comparison?.result.evidence ?? [])].map((c) => [c.id, c])).values()];
@@ -117,7 +127,13 @@ export function InspectionResults(props: Props) {
               ? '추가 정보 필요'
               : '검사 중 발견 · 확인 필요';
     return (
-      <article className="finding" data-finding={f.id} data-tier={entry.tier} key={f.id} tabIndex={-1}>
+      <article
+        className={detailed ? 'finding-support py-4 border-t' : 'finding'}
+        data-finding={f.id}
+        data-tier={entry.tier}
+        key={f.id}
+        tabIndex={-1}
+      >
         <div className="finding-heading">
           <h3>
             {f.relationship?.blocked
@@ -214,9 +230,14 @@ export function InspectionResults(props: Props) {
             )}
           </section>
         )}
-        <details className="finding-proof">
-          <summary>판단 근거 보기</summary>
-          {entry.supportCount > 0 && <p>같은 발견을 지지하는 별도 원본 {entry.supportCount}건을 상세 분석 기록에서 확인할 수 있습니다.</p>}
+        <details
+          className={detailed ? 'finding-support-proof' : 'finding-proof'}
+          open={detailed || supportFollow || (supports.length > 0 && expandRelated) ? true : undefined}
+          onToggle={(e) => {
+            if (!e.currentTarget.open && supportFollow) setFollowId('');
+          }}
+        >
+          <summary>{detailed ? '개별 검사 근거' : '판단 근거 보기'}</summary>
           <p>
             검토 분류: {entry.tier} · {entry.reasons.join(' ')}
           </p>
@@ -265,6 +286,19 @@ export function InspectionResults(props: Props) {
               문서 내용 확인·수정
             </Button>
           </div>
+          {supports.length > 0 && (
+            <details
+              className="discovery-supports"
+              open={expandRelated || supportFollow || !!openSupports[f.id]}
+              onToggle={(event) => {
+                const open = event.currentTarget.open;
+                setOpenSupports((previous) => (previous[f.id] === open ? previous : { ...previous, [f.id]: open }));
+              }}
+            >
+              <summary>같은 발견의 다른 검사 근거 {supports.length}건</summary>
+              {(expandRelated || supportFollow || openSupports[f.id]) && supports.map((e) => card(e.finding, true))}
+            </details>
+          )}
         </details>
       </article>
     );
@@ -287,7 +321,7 @@ export function InspectionResults(props: Props) {
         {group.length > 1 && (
           <details className="related-findings" open={expandRelated || group.slice(1).some((f) => f.id === followId)}>
             <summary>공유 원본의 추가 기록 {group.length - 1}건 · 개별 근거 유지</summary>
-            {group.slice(1).map(card)}
+            {group.slice(1).map((f) => card(f))}
           </details>
         )}
       </div>
@@ -300,8 +334,8 @@ export function InspectionResults(props: Props) {
         <span>필요한 항목만 확인하세요</span>
       </div>
       <div className="inspection-counts">
-        <strong>확인된 오류 {quality.filter((e) => e.finding.approved?.status === '오류').length}</strong>
-        <span>우선 확인할 문제 {quality.filter((e) => e.tier === qualityTiers[0]).length}개</span>
+        <strong>확인된 오류 {discoveries.filter((d) => d.members.some((e) => e.finding.approved?.status === '오류')).length}</strong>
+        <span>우선 확인할 문제 {discoveries.filter((d) => d.representative.tier === qualityTiers[0]).length}개</span>
       </div>
       <div className="inspection-filters">
         <label>

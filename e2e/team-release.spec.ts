@@ -76,6 +76,23 @@ test('팀원 전달본은 설정 없이 두 차이와 실제 원본 근거를 �
       ),
     ).toBe(true);
   }
+  const surplus = priority.locator('.finding').filter({ has: page.locator('.finding-values').filter({ hasText: '잉여금' }) });
+  await expect(surplus).toHaveCount(1);
+  await surplus.locator('.discovery-supports > summary').click();
+  await expect(surplus.locator('.finding-support')).toHaveCount(1);
+  await expect(surplus.locator('.finding-support')).toContainText('CROSS_VALUE');
+  await panel.locator('.quality-extra > summary').click();
+  const extra = page.getByRole('region', { name: '추가 검토', exact: true });
+  await expect(extra.locator('.finding').filter({ has: page.locator('.finding-values').filter({ hasText: '잉여금' }) })).toHaveCount(0);
+  // 동일 차이의 Word 표·문단 근거를 대표 발견 안에 각각 보존한다.
+  const assetCards = panel
+    .locator('.quality-priority .finding, .quality-extra .finding')
+    .filter({ has: page.locator('.finding-values').filter({ hasText: '총자산' }) });
+  await expect(assetCards).toHaveCount(1);
+  await assetCards.locator('.discovery-supports > summary').click();
+  await expect(assetCards.locator('.finding-support')).toHaveCount(1);
+  await expect(assetCards.locator('.finding-proof')).toContainText('본문 표 1');
+  await expect(assetCards.locator('.finding-proof')).toContainText('본문 문단 4');
   expect(blocked).toEqual([]);
   expect(readFileSync(xlsx!).equals(originalX)).toBe(true);
   expect(readFileSync(docx!).equals(originalD)).toBe(true);
