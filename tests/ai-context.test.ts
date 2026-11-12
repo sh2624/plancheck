@@ -11,7 +11,7 @@ const proposal: Proposal = {
   uncertainty: '동일 기간과 대상 확인 필요',
   evidence: [{ sourceId: 's0', quote: sources[0].text, target: '가상 ETF', number: '17', unit: '만 원', action: '중단', timing: null }],
 };
-const env = { VERCEL_ENV: 'preview', PLANCHECK_AI_ENABLED: 'true', OPENAI_API_KEY: 'test-secret-not-real' };
+const env = { VERCEL_ENV: 'preview', PLANCHECK_AI_ENABLED: 'true', OPENAI_API_KEY: 'test-secret-not-real', OPENAI_MODEL: 'gpt-4o-mini' };
 const request = (body: unknown = { consent: true, sources }) =>
   new Request('https://preview.test/api/analyze-context', {
     method: 'POST',
@@ -66,9 +66,11 @@ describe('AI 문맥 실험 안전장치', () => {
     expect(result.status).toBe(200);
     const data = await result.json();
     expect(data.proposals).toEqual([proposal]);
-    expect(data.metrics.estimatedUsd).toBeCloseTo(0.0026);
+    expect(data.metrics.estimatedUsd).toBeCloseTo(0.000135, 8);
     const options = fetcher.mock.calls[0][1]!;
     const body = JSON.parse(options.body as string);
+    expect(body.model).toBe('gpt-4o-mini');
+    expect(body).not.toHaveProperty('reasoning');
     expect(body.store).toBe(false);
     expect(body.max_output_tokens).toBe(1600);
     expect(body.text.format.strict).toBe(true);
