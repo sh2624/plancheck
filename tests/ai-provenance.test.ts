@@ -125,5 +125,16 @@ describe('AI 출처의 안전한 표기 정규화', () => {
       });
       expect(JSON.stringify((error as GroundingError).issue)).not.toMatch(/2039|별빛|173/);
     }
+    try {
+      readProposals({ proposals: [{ ...proposal, evidence: [{ ...proposal.evidence[0], unit: '원' }] }] }, sources);
+      expect.fail();
+    } catch (error) {
+      expect((error as GroundingError).issue).toMatchObject({
+        path: 'proposals[0].evidence[0]',
+        relatedFields: ['number', 'unit'],
+        category: 'amount',
+      });
+      expect(JSON.stringify((error as GroundingError).issue)).not.toContain('별빛');
+    }
   });
 });

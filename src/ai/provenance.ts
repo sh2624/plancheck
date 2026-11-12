@@ -1,4 +1,9 @@
-export type GroundingIssue = { path: string; code: string; category: 'structure' | 'source' | 'target' | 'amount' | 'action' | 'timing' };
+export type GroundingIssue = {
+  path: string;
+  code: string;
+  category: 'structure' | 'source' | 'target' | 'amount' | 'action' | 'timing';
+  relatedFields?: string[];
+};
 /** 원문 값 없이 실패 위치와 고정 코드만 전달한다. */
 export class GroundingError extends Error {
   readonly issue: GroundingIssue;
@@ -9,8 +14,8 @@ export class GroundingError extends Error {
   }
 }
 /** 개인정보를 오류 메시지에 넣지 않는다. */
-export function reject(path: string, code: string, category: GroundingIssue['category']): never {
-  throw new GroundingError({ path, code, category });
+export function reject(path: string, code: string, category: GroundingIssue['category'], relatedFields?: string[]): never {
+  throw new GroundingError({ path, code, category, ...(relatedFields ? { relatedFields } : {}) });
 }
 const compact = (text: string) => text.replace(/\s/gu, '');
 /** 공백 차이만 허용하고 실제 원문의 연속 구간을 돌려준다. 동의어·문장 재작성은 허용하지 않는다. */

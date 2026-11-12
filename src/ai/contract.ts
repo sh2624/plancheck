@@ -50,7 +50,7 @@ export function readRequest(value: unknown): ContextSource[] {
 /** 구조화 응답도 신뢰하지 않고 출처·인용·숫자·행동의 원문 일치를 재검사한다. */
 export function readProposals(value: unknown, sources: ContextSource[]): Proposal[] {
   if (!object(value) || !keys(value, ['proposals']) || !Array.isArray(value.proposals) || value.proposals.length > 12)
-    throw new Error('INVALID_OUTPUT');
+    reject('proposals', 'INVALID_OUTPUT', 'structure');
   return value.proposals.map((p: unknown, proposalIndex: number) => {
     const path = `proposals[${proposalIndex}]`;
     let referencedTiming = false;
@@ -65,7 +65,7 @@ export function readProposals(value: unknown, sources: ContextSource[]): Proposa
       !p.evidence.length ||
       p.evidence.length > 8
     )
-      throw new Error('INVALID_PROPOSAL');
+      reject(path, 'INVALID_PROPOSAL', 'structure');
     const rawEvidence = p.evidence;
     const evidence = rawEvidence.map((e: unknown, evidenceIndex: number) => {
       const base = `${path}.evidence[${evidenceIndex}]`;
@@ -77,7 +77,7 @@ export function readProposals(value: unknown, sources: ContextSource[]): Proposa
         !e.quote ||
         (e.target !== null && typeof e.target !== 'string')
       )
-        throw new Error('INVALID_EVIDENCE');
+        reject(base, 'INVALID_EVIDENCE', 'structure');
       const source = sources.find((s) => s.id === e.sourceId);
       if (!source) reject(`${base}.sourceId`, 'UNSUPPORTED_SOURCE', 'source');
       const quote = originalSpan(source.text, e.quote);
@@ -92,9 +92,10 @@ export function readProposals(value: unknown, sources: ContextSource[]): Proposa
       let timing = absent(e.timing);
       let amount: { number: string; unit: string } | null = null;
       if (number !== null || unit !== null) {
-        if (typeof number !== 'string' || typeof unit !== 'string') reject(`${base}.number`, 'INVALID_UNIT', 'amount');
+        if (typeof number !== 'string') reject(`${base}.number`, 'UNSUPPORTED_NUMBER', 'amount');
+        if (typeof unit !== 'string') reject(`${base}.unit`, 'INVALID_UNIT', 'amount');
         amount = originalAmount(number, unit, quote);
-        if (!amount) reject(`${base}.number`, 'UNSUPPORTED_AMOUNT_UNIT', 'amount');
+        if (!amount) reject(base, 'UNSUPPORTED_AMOUNT_UNIT', 'amount', ['number', 'unit']);
       }
       if (typeof timing === 'string' && !originalSpan(quote, timing) && /(?:같은|동일한?|해당)\s*(?:기간|시점|날짜)/.test(quote)) {
         const literal = timing;
