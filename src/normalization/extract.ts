@@ -1,6 +1,7 @@
 ﻿import type { Workbook, WordDocument } from '../parsers/types';
 import type { Candidate, Field, Unit } from './types';
 import { classify, normalize, unitOf } from './values';
+import { declaredUnits, isHeader, isDateText, resolveUnit, periodOf, type UnitHint } from './unitContext';
 const numeric = /^[+-]?(?:\d[\d,]*(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?\s*(?:억\s*원|만\s*원|원|%|개월|년)?$/i;
 const token = /[+-]?\d[\d,]*(?:\.\d+)?(?:e[+-]?\d+)?/i;
 function metadata(text: string) {
@@ -59,80 +60,166 @@ function column(address: string) {
 function rowNumber(address: string) {
   return Number(address.match(/\d+/)?.[0] ?? 0);
 }
+const columnIndex = (s: string) => [...s].reduce((n, c) => n * 26 + c.charCodeAt(0) - 64, 0);
 /** 숫자와 항목명이 같은 행에 있는 셀을 열 제목·명시 단위와 함께 후보화한다. */
 export function extractWorkbook(book: Workbook): Candidate[] {
   const output: Candidate[] = [];
   for (const sheet of book.sheets) {
     const rows = new Map<number, typeof sheet.cells>();
     for (const cell of sheet.cells) rows.set(rowNumber(cell.address), [...(rows.get(rowNumber(cell.address)) ?? []), cell]);
-    let unit: Unit = '미확인',
-      meta = { asOf: '', scenario: '' };
+    let sheetHint: UnitHint | undefined, tableHint: UnitHint | undefined;
+    let meta = { asOf: '', scenario: '' },
+      previousRow = 0,
+      region = `${sheet.name}:1`,
+      title = '',
+      titleRow = 0;
     const headers = new Map<string, string>();
+    const columnHints = new Map<string, UnitHint>();
+    const sheetPeriods = new Map<string, string>();
+    let headerPending = false;
     for (const cells of rows.values()) {
+      const row = rowNumber(cells[0].address);
+      if (previousRow && row > previousRow + 1) {
+        headers.clear();
+        columnHints.clear();
+        tableHint = undefined;
+        title = '';
+        headerPending = false;
+        region = `${sheet.name}:${row}`;
+      }
+      previousRow = row;
       const text = cells
         .map((c) => c.value)
         .filter(Boolean)
         .join(' | ');
-      if (/단위\s*[:：]/.test(text)) unit = unitOf(text.match(/단위\s*[:：]\s*([^·|\n]+)/)?.[1] ?? '');
+      const units = declaredUnits(text.match(/단위\s*[:：]\s*([^·|\n]+)/)?.[1] ?? '');
+      if (units.length && !cells.some((c) => isHeader(c.value))) {
+        const hint: UnitHint = {
+          units,
+          location: `${sheet.name}!${cells[0].address}`,
+          level:
+            /시트\s*단위/.test(text) ||
+            (!/표|현황|명세|내역/.test(text) && !headers.size && !output.some((c) => c.location.startsWith(sheet.name + '!')))
+              ? 'sheet'
+              : 'table',
+        };
+        if (hint.level === 'sheet') sheetHint = hint;
+        else tableHint = hint;
+      }
       const found = metadata(text);
       meta = {
         asOf: found.asOf || meta.asOf,
         scenario: found.scenario || meta.scenario,
       };
-      if (cells.some((c) => /^(항목|금액|구분|월|연)$/.test(c.value.trim()))) {
-        for (const c of cells) if (c.value) headers.set(column(c.address), c.value.trim());
+      const hasNumbers = cells.some((c) => numeric.test(c.value.trim()));
+      if (!hasNumbers && cells.some((c) => isHeader(c.value))) {
+        if (row !== titleRow + 1) tableHint = undefined;
+        if (!headerPending) {
+          headers.clear();
+          columnHints.clear();
+          region = `${sheet.name}:${row}`;
+        }
+        for (const c of cells)
+          if (c.value)
+            headers.set(
+              column(c.address),
+              headerPending && headers.has(column(c.address)) ? `${c.value.trim()} · ${headers.get(column(c.address))}` : c.value.trim(),
+            );
+        if (sheetHint) for (const c of cells) if (/^(월|연)$/.test(c.value.trim())) sheetPeriods.set(column(c.address), c.value.trim());
+        for (const c of cells)
+          if (declaredUnits(c.value).length) {
+            const merge = sheet.merges.find((m) => m.startsWith(c.address + ':'));
+            const covered = merge
+              ? [...new Set(sheet.cells.map((x) => column(x.address)))].filter(
+                  (col) =>
+                    columnIndex(col) >= columnIndex(column(c.address)) && columnIndex(col) <= columnIndex(column(merge.split(':')[1])),
+                )
+              : [column(c.address)];
+            for (const col of covered)
+              columnHints.set(col, { units: declaredUnits(c.value), location: `${sheet.name}!${c.address}`, level: 'column' });
+          }
+        headerPending = true;
+        continue;
       }
-      const firstNumeric = cells.findIndex((c) => numeric.test(c.value.trim()) && c.type !== 's' && c.type !== 'inlineStr');
+      if (!hasNumbers && cells.length === 1 && /표|현황|명세|내역/.test(text)) {
+        headers.clear();
+        columnHints.clear();
+        region = `${sheet.name}:${row}`;
+        title = text;
+        titleRow = row;
+        tableHint = declaredUnits(text).length
+          ? { units: declaredUnits(text), location: `${sheet.name}!${cells[0].address}`, level: 'table' }
+          : undefined;
+        continue;
+      }
+      const firstNumeric = cells.findIndex(
+        (c) =>
+          numeric.test(c.value.trim()) && c.type !== 'd' && !isDateText(c.value) && !/yyyy|yy|dd|m\/d|d\/m/i.test(c.numberFormat ?? ''),
+      );
+      headerPending = false;
       const labels = cells
         .slice(0, firstNumeric < 0 ? cells.length : firstNumeric)
         .filter((c) => c.value.trim() && !numeric.test(c.value.trim()));
       const label = labels.map((c) => c.value).join(' · ');
-      const field = classify(label);
-      if (!field || /단위|기준|※/.test(label)) continue;
+      const field =
+        classify(label) ??
+        (/^(합계|총계)$/.test(label) ? (/부채/.test(title) ? 'totalDebt' : /자산/.test(title) ? 'totalAssets' : null) : null);
+      if (/단위|기준|※/.test(label)) continue;
       const values = firstNumeric < 0 ? [] : cells.slice(firstNumeric).filter((c) => numeric.test(c.value.trim()) || c.formula);
       let emitted = false;
       for (const c of values) {
         const header = headers.get(column(c.address)) ?? '';
-        if (/대비|비율|비중|비고|상태|확정/.test(header)) continue;
+        if (
+          /대비|비율|비중|비고|상태|확정|기준일|일자|날짜/.test(header) ||
+          c.type === 'd' ||
+          /yyyy|yy|dd|m\/d|d\/m/i.test(c.numberFormat ?? '')
+        )
+          continue;
+        const valueField = field ?? classify(header);
+        if (!valueField) continue;
+        const valueLabel = field ? label : `${label} · ${header}`;
         const isPercent = !!c.numberFormat?.includes('%');
-        if (isPercent && field !== 'loanRate') continue;
-        const valueUnit: Unit =
-          field === 'loanRate'
-            ? isPercent
-              ? '%'
-              : unitOf(label)
-            : field === 'loanTerm'
-              ? unitOf(label)
-              : unitOf(c.value) === '미확인'
-                ? unit
-                : unitOf(c.value);
-        const period =
-          header === '연'
-            ? '연간'
-            : header === '월' ||
-                (['income', 'fixedExpense', 'variableExpense', 'savings', 'surplus', 'loanPayment'].includes(field) &&
-                  /월|고정지출|변동지출|저축·투자/.test(label))
-              ? '월간'
-              : '';
+        if (isPercent && valueField !== 'loanRate') continue;
+        const labelUnit = unitOf(valueLabel.match(/[（(]\s*(억\s*원|만\s*원|원|%|개월|년)\s*[）)]/)?.[1] ?? '');
+        const explicit = isPercent ? '%' : unitOf(c.value) !== '미확인' ? unitOf(c.value) : labelUnit;
+        const resolved = resolveUnit(
+          explicit,
+          [sheetHint, tableHint, columnHints.get(column(c.address))].filter((h): h is UnitHint => !!h),
+          region,
+          column(c.address),
+        );
+        const valueUnit = resolved.unit;
+        const flowField = ['income', 'fixedExpense', 'variableExpense', 'savings', 'surplus', 'loanPayment'].includes(valueField);
+        const period = periodOf(header || (flowField ? sheetPeriods.get(column(c.address)) : '') || '', valueLabel, flowField);
         const raw = c.review ? '' : isPercent ? String(Number(c.value) * 100) : c.value;
         const item = candidate(
           'XLSX',
           book.fileName,
           `${sheet.name}!${c.address}`,
-          label,
+          valueLabel,
           raw,
-          field,
+          valueField,
           valueUnit,
           text,
           meta,
           period,
-          c.review ? '원본 수식/값 확인 필요' : field === 'loanRate' && !isPercent ? '금리 표시 단위 확인 필요' : '',
+          c.review
+            ? '원본 수식/값 확인 필요'
+            : resolved.evidence.level === 'conflict'
+              ? '단위 선언 충돌 · 원문 범위를 확인하세요'
+              : valueField === 'loanRate' && !isPercent
+                ? '금리 표시 단위 확인 필요'
+                : '',
         );
         item.originalNumber = c.value || null;
+        item.unitEvidence = {
+          ...resolved.evidence,
+          locations: resolved.evidence.level === 'cell' ? [`${sheet.name}!${c.address}`] : resolved.evidence.locations,
+        };
         output.push(item);
         emitted = true;
       }
-      if (!emitted && !values.length)
+      if (!emitted && !values.length && field)
         output.push(
           candidate(
             'XLSX',
@@ -141,7 +228,12 @@ export function extractWorkbook(book: Workbook): Candidate[] {
             label,
             '',
             field,
-            unit,
+            resolveUnit(
+              '미확인',
+              [sheetHint, tableHint].filter((h): h is UnitHint => !!h),
+              region,
+              '',
+            ).unit,
             text,
             meta,
             '',
@@ -164,7 +256,7 @@ function prose(text: string, location: string, fileName: string, globalMeta: { a
     const local = before.split(/[,.。;\n]/).at(-1) ?? before;
     const keywords = [
       ...local.matchAll(
-        /월\s*실수령(?:\s*소득)?|월\s*소득|고정지출|변동지출|월\s*잉여|미배분\s*잉여|여유\s*자금|총자산|자산\s*합계|총부채|부채\s*합계|순자산|예금(?:·적금)?|적금|ETF|퇴직연금(?:\(DC\))?|보증금|목표액|결혼자금|비상자금|의료비\s*예비비|전세자금|자금\s*출처|재원/g,
+        /월\s*실수령(?:\s*소득)?|월\s*(?:소득|수입)|월\s*지출|월\s*저축(?:\s*[·ㆍ/]\s*투자)?|고정지출|변동지출|월\s*잉여금?|미배분\s*잉여|여유\s*자금|총자산|자산\s*합계|총부채|부채\s*합계|순자산|예금(?:·적금)?|적금|청약저축|ETF|퇴직연금(?:\(DC\))?|보증금|목표액|결혼자금|비상자금|의료비\s*예비비|전세자금|자금\s*출처|재원/g,
       ),
     ];
     const key = keywords.at(-1);
@@ -183,12 +275,13 @@ function prose(text: string, location: string, fileName: string, globalMeta: { a
       label = `${loan[0]} ${field === 'loanRate' ? '연금리' : field === 'loanBalance' ? '잔액' : field === 'loanTerm' ? '기간' : '월 상환액'}`;
     }
     if (!field || !label || (u === '%' && field !== 'loanRate') || (u === '개월' && field !== 'loanTerm')) continue;
-    if (key && !/loan/.test(field) && index - (key.index! + Math.max(0, index - 45)) > 35) continue;
+    if (key && !/loan/.test(field) && index - (key.index! + before.lastIndexOf(local) + Math.max(0, index - 45)) > 35) continue;
     if (key && !/loan/.test(field)) {
       const gap = local.slice(key.index! + key[0].length);
       if (!/^(?:[\s()·:：]|평가액|적립금|잔액|은|는|이|가|약|합계|총액|금액|적립|월|현재|일부|DC)*$/.test(gap)) continue;
       if (/월/.test(gap) && ['deposit', 'etf', 'pension'].includes(field)) field = 'savings';
     }
+    const future = /(?:\d+\s*(?:년|개월)\s*후)/.exec(before)?.[0];
     result.push(
       candidate(
         'DOCX',
@@ -203,7 +296,7 @@ function prose(text: string, location: string, fileName: string, globalMeta: { a
           asOf: globalMeta.asOf,
           scenario: metadata(text).scenario || globalMeta.scenario,
         },
-        /월/.test(label) ? '월간' : '',
+        future ?? (/월/.test(label) || (field === 'savings' && /월/.test(before)) ? '월간' : ''),
         '문단 근접 추출 · 수치의 대상과 적용 시점 확인 필요',
       ),
     );
@@ -267,11 +360,32 @@ export function extractWord(doc: WordDocument): Candidate[] {
       output.push(...prose(block.text, block.location, doc.fileName, meta));
       continue;
     }
-    const headers = block.rows[0] ?? [];
+    let headers = block.rows[0] ?? [];
+    const columnUnits = new Map<number, UnitHint>();
+    let previousHeader = false;
     let category = '';
     block.rows.forEach((row, ri) => {
-      if (ri === 0 && row.some((c) => /^(항목|금액|월|구분|내용)$/.test(c.text))) return;
-      const first = row.findIndex((c) => numeric.test(c.text.trim()) || c.text.split('/').every((x) => numeric.test(x.trim())));
+      if (row.some((c) => isHeader(c.text)) && !row.some((c) => numeric.test(c.text.trim()))) {
+        if (!previousHeader) columnUnits.clear();
+        const old = headers;
+        headers = previousHeader
+          ? row.map((c) => ({ ...c, text: `${c.text} · ${old.find((p) => p.column === c.column)?.text ?? ''}` }))
+          : row;
+        for (const c of row)
+          if (declaredUnits(c.text).length)
+            for (let col = c.column; col < c.column + c.span; col++)
+              columnUnits.set(col, {
+                units: declaredUnits(c.text),
+                location: `${block.location} · ${ri + 1}행 ${c.column}열`,
+                level: 'column',
+              });
+        previousHeader = true;
+        return;
+      }
+      previousHeader = false;
+      const first = row.findIndex(
+        (c) => !isDateText(c.text) && (numeric.test(c.text.trim()) || c.text.split('/').every((x) => numeric.test(x.trim()))),
+      );
       if (first < 0) {
         const name = row
           .slice(0, 2)
@@ -305,36 +419,55 @@ export function extractWord(doc: WordDocument): Candidate[] {
       if (row[0]?.text && /^(고정지출|변동지출|저축·투자)$/.test(row[0].text)) category = row[0].text;
       const label = labels.join(' · '),
         field = classify(label) ?? classify(`${category} ${label}`);
-      if (!field) return;
       for (const c of row.slice(first)) {
         const header = headers.find((h) => h.column === c.column)?.text ?? '';
-        if (/대비|비중|비율|비고/.test(header)) continue;
+        if (/대비|비중|비율|비고|기준일|일자|날짜/.test(header) || isDateText(c.text)) continue;
         const parts = c.text.split('/').map((x) => x.trim());
         if (!parts.every((x) => numeric.test(x))) continue;
         for (const [partIndex, part] of parts.entries()) {
           const splitLabels = (labels.at(-1) ?? '').split('/').map((x) => x.trim());
-          const partLabel = parts.length > 1 && splitLabels.length === parts.length ? splitLabels[partIndex] : label;
-          const partField = parts.length > 1 ? (classify(partLabel) ?? classify(`${category} ${partLabel}`) ?? 'unknown') : field;
-          const u = unitOf(part) === '미확인' ? unit : unitOf(part);
+          const partLabel =
+            parts.length > 1 && splitLabels.length === parts.length ? splitLabels[partIndex] : field ? label : `${label} · ${header}`;
+          const partField =
+            parts.length > 1 ? (classify(partLabel) ?? classify(`${category} ${partLabel}`) ?? 'unknown') : (field ?? classify(header));
+          if (!partField) continue;
+          const hints: UnitHint[] = [
+            ...(unit !== '미확인' ? [{ units: [unit], location: '본문 단위 선언', level: 'sheet' as const }] : []),
+            ...(columnUnits.has(c.column) ? [columnUnits.get(c.column)!] : []),
+          ];
+          const resolved = resolveUnit(unitOf(part), hints, block.location, String(c.column));
+          const u = resolved.unit;
           if (u === '%' && partField !== 'loanRate') continue;
-          output.push(
-            candidate(
-              'DOCX',
-              doc.fileName,
-              `${block.location} · ${ri + 1}행 ${c.column}열 · 값 ${partIndex + 1}`,
+          const item = candidate(
+            'DOCX',
+            doc.fileName,
+            `${block.location} · ${ri + 1}행 ${c.column}열 · 값 ${partIndex + 1}`,
+            partLabel,
+            part,
+            partField,
+            u,
+            row.map((x) => x.text).join(' | '),
+            {
+              asOf: meta.asOf,
+              scenario: metadata(header).scenario || meta.scenario,
+            },
+            periodOf(
+              header,
               partLabel,
-              part,
-              partField,
-              u,
-              row.map((x) => x.text).join(' | '),
-              {
-                asOf: meta.asOf,
-                scenario: metadata(header).scenario || meta.scenario,
-              },
-              header === '월' ? '월간' : header === '연' ? '연간' : (header.match(/\d{4}/)?.[0] ?? ''),
-              parts.length > 1 ? '복수 값 · 세부 항목을 확인해 주세요' : '',
+              ['income', 'fixedExpense', 'variableExpense', 'savings', 'surplus', 'loanPayment'].includes(partField) &&
+                /월|매월/.test(partLabel),
             ),
+            resolved.evidence.level === 'conflict'
+              ? '단위 선언 충돌 · 원문 범위를 확인하세요'
+              : parts.length > 1
+                ? '복수 값 · 세부 항목을 확인해 주세요'
+                : '',
           );
+          item.unitEvidence = {
+            ...resolved.evidence,
+            locations: resolved.evidence.level === 'cell' ? [item.location] : resolved.evidence.locations,
+          };
+          output.push(item);
         }
       }
     });

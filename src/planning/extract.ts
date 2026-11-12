@@ -93,7 +93,8 @@ export function extractPlanning(refs: EvidenceRef[]): Pick<Planning, 'actions' |
       }
       if (/지원금|지원|세액공제|정부기여금|기여금|보험금|환급/.test(text)) {
         const amounts = [...text.matchAll(/([+-]?\d[\d,]*(?:\.\d+)?)\s*(억\s*원|만\s*원|원)/g)];
-        const ambiguousAmount = /\d[\d,.]*\s*[~～–-]\s*\d|억\s*(?:원\s*)?\d/.test(text);
+        const withoutDates = text.replace(/\d{4}-\d{2}-\d{2}/g, '');
+        const ambiguousAmount = /\d[\d,.]*\s*[~～–-]\s*\d|억\s*(?:원\s*)?\d/.test(withoutDates);
         const value = amounts.length === 1 && !ambiguousAmount ? amounts[0] : undefined;
         funds.push({
           ...newRecord('fund', `auto:fund:${key}`),

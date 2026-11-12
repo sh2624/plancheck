@@ -62,6 +62,8 @@ function calculations(items: Candidate[]): Recommendation[] {
           .map((c) => c.id);
       if (rule === 'debt')
         spec.groups.parts = candidates.filter((c) => c.field === 'loanBalance' && !/소계|합계|참고/.test(c.label)).map((c) => c.id);
+      if (rule === 'assets' && target.source === 'DOCX' && spec.groups.parts?.length === 1)
+        scopeIssues.push('자산 구성 항목이 하나만 제시돼 전체 합계의 범위인지 확인해야 합니다.');
       if (rule === 'net') {
         spec.groups.assets = candidates.filter((c) => c.field === 'totalAssets').map((c) => c.id);
         spec.groups.debt = candidates.filter((c) => c.field === 'totalDebt').map((c) => c.id);
@@ -76,9 +78,8 @@ function calculations(items: Candidate[]): Recommendation[] {
         const inclusive = candidates.filter(
           (c) =>
             ['fixedExpense', 'variableExpense'].includes(c.field) &&
-            /생활비\s*합계|총지출|지출\s*합계/.test(c.label) &&
-            /고정.*변동/.test(c.label) &&
-            /부채|상환/.test(c.label),
+            (/월\s*(?:총\s*)?지출\s*(?:합계|총계)|월\s*총지출/.test(c.label) ||
+              (/생활비\s*합계|총지출|지출\s*합계/.test(c.label) && /고정.*변동/.test(c.label) && /부채|상환/.test(c.label))),
         );
         if (inclusive.length === 1) spec.groups.expense = [inclusive[0].id];
         if (inclusive.length > 1) scopeIssues.push('지출 총합 후보가 여러 개입니다. 구성 범위를 선택하세요.');

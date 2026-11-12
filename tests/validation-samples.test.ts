@@ -62,7 +62,10 @@ it.skipIf(paths.some((p) => !p))('실제 샘플의 선택 확인 항목으로 �
       (c) => ['deposit', 'etf', 'housingDeposit', 'pension'].includes(c.field) && !/[+＋]|합계|소계|참고/.test(c.label),
     );
     const assetResult = validateCalculation(verified, calculation('assets', total.id, { parts: assets.map((c) => c.id) }));
-    expect(assetResult.status).toBe('검증 통과');
+    expect(
+      assetResult.status,
+      `${total.source}: ${assetResult.basis} ${assetResult.needs.join(' / ')} ${JSON.stringify(assets.map((c) => ({ label: c.label, unit: c.unit, period: c.period })))}`,
+    ).toBe('검증 통과');
     const debt = choose(same, 'totalDebt'),
       net = choose(same, 'netAssets');
     expect(validateCalculation(verified, calculation('net', net.id, { assets: [total.id], debt: [debt.id] })).status).toBe('검증 통과');

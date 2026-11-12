@@ -3,6 +3,7 @@ import { compatibleUnit } from './values';
 import { assessRelationship } from './relationships';
 /** 합계 항목은 유형으로, 세부 항목은 명칭의 공통 어휘로 연결 범위를 좁힌다. */
 function similarName(a: Candidate, b: Candidate) {
+  if (a.label.replace(/[\s·ㆍ/]/g, '') === b.label.replace(/[\s·ㆍ/]/g, '')) return true;
   if (['income', 'totalAssets', 'totalDebt', 'netAssets', 'surplus', 'deposit', 'etf', 'pension', 'housingDeposit'].includes(a.field))
     return true;
   const tokens = (c: Candidate) =>

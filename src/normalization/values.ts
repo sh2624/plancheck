@@ -52,17 +52,18 @@ export function classify(text: string): Field | null {
     return 'loanBalance';
   }
   if (/순자산/.test(t)) return 'netAssets';
-  if (/총자산|자산합계/.test(t)) return 'totalAssets';
-  if (/총부채|부채합계/.test(t)) return 'totalDebt';
-  if (/실수령|월소득/.test(t)) return 'income';
+  if (/총자산|자산합계|자산총계/.test(t)) return 'totalAssets';
+  if (/총부채|부채합계|부채총계/.test(t)) return 'totalDebt';
+  if (/실수령|월소득|월수입/.test(t)) return 'income';
   if (/잉여|여유자금/.test(t)) return 'surplus';
   if (/고정지출/.test(t)) return 'fixedExpense';
   if (/변동지출/.test(t)) return 'variableExpense';
+  if (/월지출|월총지출/.test(t)) return 'fixedExpense';
   if (/퇴직연금|\bDC\b/.test(t)) return 'pension';
-  if (/저축·투자|적립|월납입|총저축|노후대비저축/.test(t)) return 'savings';
+  if (/저축[·ㆍ/]|저축및투자|월저축|월투자|적립|월납입|총저축|노후대비저축/.test(t)) return 'savings';
   if (/보증금/.test(t)) return 'housingDeposit';
   if (/ETF/i.test(t)) return 'etf';
-  if (/예금|적금/.test(t)) return 'deposit';
+  if (/예금|적금|청약저축|주택청약/.test(t)) return 'deposit';
   if (/목표액|목표금액/.test(t)) return 'goalAmount';
   if (/결혼자금|비상자금|의료비예비비|전세자금/.test(t)) return 'goalAmount';
   if (/재원|자금출처/.test(t)) return 'fundingSource';

@@ -7,6 +7,7 @@ import { suggestLinks } from '../normalization/links';
 import { candidateValue } from '../presentation/workflow';
 import { formatFinancial } from '../presentation/format';
 import { assessRelationship } from '../normalization/relationships';
+import { BulkUnits } from './BulkUnits';
 type Props = {
   coreIds?: string[];
   reasons?: { ids: string[]; reason: string; title: string }[];
@@ -89,6 +90,7 @@ export function ReviewView({ coreIds, reasons = [], items, links, onEdit, onConf
         필요한 항목만 확인하세요. 기준일·기간·시나리오·항목 유형·확정 여부와 모든 수정 기능은 ‘상세 편집’에 있습니다. 확인되지 않은 값은
         확정 오류로 판정하지 않습니다.
       </p>
+      <BulkUnits items={items} onEdit={onEdit} />
       {coreIds && (
         <p className="review-progress" role="status">
           핵심 확인 진행: {items.filter((c) => coreIds.includes(c.id) && !c.excluded && c.confirmed).length} /{' '}
