@@ -6,6 +6,8 @@ import { extractWorkbook, extractWord } from '../src/normalization/extract';
 import { extractPlanning, workbookReferences, wordReferences } from '../src/planning/extract';
 import { emptyPlanning } from '../src/planning/types';
 import { inspectDocuments } from '../src/inspection/analyze';
+import { reviewQuality } from '../src/inspection/quality';
+import { groupDiscoveries } from '../src/presentation/discoveries';
 
 it.skipIf(!process.env.PLANCHECK_AFPK_XLSX || !process.env.PLANCHECK_AFPK_DOCX)(
   'AFPK 실제 파일의 파서·정규화·검사 경로를 평가한다',
@@ -19,6 +21,26 @@ it.skipIf(!process.env.PLANCHECK_AFPK_XLSX || !process.env.PLANCHECK_AFPK_DOCX)(
     const references = [...workbookReferences(book), ...wordReferences(doc)];
     const planning = { ...emptyPlanning(), ...extractPlanning(references) };
     const findings = inspectDocuments({ items, references, planning, links: [], calculations: [] });
+    const quality = reviewQuality(findings),
+      discoveries = groupDiscoveries(quality);
+    const priority = discoveries.filter((g) => g.representative.tier === '우선 검토');
+    expect(priority).toHaveLength(2);
+    expect(discoveries.filter((g) => g.representative.tier === '추가 검토')).toHaveLength(0);
+    expect(priority.find((g) => g.explanation)?.members.some((e) => e.finding.result.evidence[0]?.field === 'netAssets')).toBe(true);
+    expect(
+      quality
+        .filter((e) => e.finding.relationship?.blocked)
+        .every((e) => e.tier === '상세 분석 기록' && e.finding.result.difference === null),
+    ).toBe(true);
+    expect(discoveries.flatMap((g) => g.members).length).toBe(quality.length);
+    expect(
+      findings.some(
+        (f) =>
+          f.kind === 'CROSS' &&
+          f.result.evidence.some((c) => c.field === 'totalAssets') &&
+          f.result.evidence.some((c) => /입출금통장/.test(c.label)),
+      ),
+    ).toBe(false);
     mkdirSync('.cache/afpk', { recursive: true });
     writeFileSync(
       `.cache/afpk/${process.env.PLANCHECK_AFPK_PHASE ?? 'after'}.json`,

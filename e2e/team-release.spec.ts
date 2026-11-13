@@ -90,7 +90,12 @@ test('팀원 전달본은 설정 없이 두 차이와 실제 원본 근거를 �
     .filter({ has: page.locator('.finding-values').filter({ hasText: '총자산' }) });
   await expect(assetCards).toHaveCount(1);
   await assetCards.locator('.discovery-supports > summary').click();
-  await expect(assetCards.locator('.finding-support')).toHaveCount(1);
+  await expect(assetCards.locator('.finding-support')).toHaveCount(2);
+  await expect(
+    assetCards.locator('.finding-support').filter({ has: page.locator('.finding-values').filter({ hasText: '총자산' }) }),
+  ).toHaveCount(1);
+  await expect(assetCards.locator('.finding-support').filter({ has: page.getByRole('heading', { name: /순자산/ }) })).toHaveCount(1);
+  await expect(assetCards.locator('.finding-proof')).toContainText('순자산 = 총자산 − 총부채');
   await expect(assetCards.locator('.finding-proof')).toContainText('본문 표 1');
   await expect(assetCards.locator('.finding-proof')).toContainText('본문 문단 4');
   expect(blocked).toEqual([]);

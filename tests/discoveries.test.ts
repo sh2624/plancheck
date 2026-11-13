@@ -114,3 +114,21 @@ it('공통 원본의 반복 기재만 묶고 각 근거를 보존한다', () => 
   };
   expect(groupDiscoveries(reviewQuality([cross, unrelated]))).toHaveLength(2);
 });
+it('합계의 단순 별칭은 묶되 별도 범위 명칭은 같은 값이어도 합치지 않는다', () => {
+  const { cross } = records();
+  const base = {
+    ...cross,
+    result: { ...cross.result, evidence: cross.result.evidence.map((c) => ({ ...c, field: 'totalAssets' as const, label: '총자산' })) },
+  };
+  const repeat = {
+    ...base,
+    id: 'repeat',
+    result: {
+      ...base.result,
+      evidence: base.result.evidence.map((c) => (c.source === 'DOCX' ? { ...c, label: '총자산 합계', location: '본문 표 2' } : c)),
+    },
+  };
+  expect(groupDiscoveries(reviewQuality([base, repeat]))).toHaveLength(1);
+  repeat.result.evidence[1].label = '과세 대상 총자산';
+  expect(groupDiscoveries(reviewQuality([base, repeat]))).toHaveLength(2);
+});

@@ -203,25 +203,40 @@ export function InspectionResults(props: Props) {
           </span>
         </div>
         <div className="finding-values">
-          {summary
-            ? summary.values.map((value, i) => (
-                <p key={i}>
-                  <span>{value.label}</span>
-                  <strong>{value.value}</strong>
-                </p>
-              ))
-            : valueEvidence.slice(0, f.kind === 'CROSS' || comparison ? 2 : 4).map((c) => (
-                <p key={c.id}>
-                  <span>
-                    {c.source === 'XLSX' ? 'Excel' : 'Word'} · {c.label}
-                  </span>
-                  <strong>
-                    {r.unit === '원' && ['원', '만 원', '억 원'].includes(c.unit) && c.normalizedValue !== null
-                      ? formatted.value(c.normalizedValue)
-                      : candidateValue(c)}
-                  </strong>
-                </p>
-              ))}
+          {summary ? (
+            summary.values.map((value, i) => (
+              <p key={i}>
+                <span>{value.label}</span>
+                <strong>{value.value}</strong>
+              </p>
+            ))
+          ) : f.kind === 'CALC' && !comparison && r.expected !== null && r.evidence[0] ? (
+            <>
+              <p>
+                <span>
+                  {r.evidence[0].source === 'XLSX' ? 'Excel' : 'Word'} · {r.evidence[0].label}
+                </span>
+                <strong>{formatted.value(r.actual)}</strong>
+              </p>
+              <p>
+                <span>{['CALC_ASSETS', 'CALC_DEBT'].includes(r.code) ? `구성 항목 ${r.evidence.length - 1}개 합계` : '재계산 결과'}</span>
+                <strong>{formatted.value(r.expected)}</strong>
+              </p>
+            </>
+          ) : (
+            valueEvidence.slice(0, f.kind === 'CROSS' || comparison ? 2 : 4).map((c) => (
+              <p key={c.id}>
+                <span>
+                  {c.source === 'XLSX' ? 'Excel' : 'Word'} · {c.label}
+                </span>
+                <strong>
+                  {r.unit === '원' && ['원', '만 원', '억 원'].includes(c.unit) && c.normalizedValue !== null
+                    ? formatted.value(c.normalizedValue)
+                    : candidateValue(c)}
+                </strong>
+              </p>
+            ))
+          )}
         </div>
         {!summary && !r.evidence.length && (
           <p className="finding-comparison">
@@ -356,6 +371,7 @@ export function InspectionResults(props: Props) {
             </p>
           )}
           <p className="pre">{readableBasis(r, props.planning, props.references)}</p>
+          {!detailed && discovery?.explanation && <p>{discovery.explanation}</p>}
           {comparison && <p className="pre">문서 간 비교 근거: {comparison.result.basis}</p>}
           {proofEvidence.map((c) => (
             <div className="finding-evidence" key={c.id}>
