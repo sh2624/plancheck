@@ -555,6 +555,12 @@ export default function App() {
             <InspectionResults
               onPlanReview={(finding, choice) => {
                 revision.current++;
+                if (finding.kind === 'CALC' && choice !== 'same')
+                  setCalculations((previous) =>
+                    previous.map((spec) =>
+                      spec.id === finding.recommendation?.calculation?.id ? { ...spec, scopeConfirmed: false } : spec,
+                    ),
+                  );
                 const ids = finding.result.evidence.map((c) => c.id);
                 setInlineDecisions((previous) => ({
                   ...previous,

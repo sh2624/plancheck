@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { accuracyFiles, accuracySheet, accuracyDate, accuracyEnd } from '../tests/accuracy-files';
 
-test('주입한 총자산 차이는 고급 승인 4회 조작으로 확정되고 같은 관계는 재사용한다', async ({ page }, info) => {
+test('주입한 총자산 차이는 고급 승인 5회 조작으로 확정되고 같은 관계는 재사용한다', async ({ page }, info) => {
   test.skip(!process.env.PLANCHECK_XLSX || !process.env.PLANCHECK_DOCX, '원본 문서 경로 필요');
   const files = await accuracyFiles('CROSS', true);
   await page.goto('/');
@@ -39,12 +39,14 @@ test('주입한 총자산 차이는 고급 승인 4회 조작으로 확정되고
   const inline = page.getByRole('region', { name: '선택 항목 상세 검토' });
   await inline.getByLabel('예, 같은 기준입니다.', { exact: true }).check();
   actions++;
+  await inline.locator('.review-advanced > summary').click();
+  actions++;
   await inline.getByRole('button', { name: '최종 판정 조건 입력' }).click();
   actions++;
   await expect(inline.getByRole('textbox')).toHaveCount(0);
   await inline.getByRole('button', { name: '확인 내용 적용' }).click();
   actions++;
-  expect(actions).toBe(4);
+  expect(actions).toBe(5);
   const confirmed = panel.locator('.finding').filter({ hasText: '확인된 오류' }).filter({ hasText: '20만 원' }).first();
   await expect(confirmed).toContainText('총자산');
   await confirmed.getByText('판단 근거 보기', { exact: true }).click();
@@ -56,7 +58,7 @@ test('주입한 총자산 차이는 고급 승인 4회 조작으로 확정되고
   actions++;
   await expect(inline.getByLabel('예, 같은 기준입니다.', { exact: true })).toBeChecked();
   await expect(inline).toContainText('이미 승인했습니다');
-  await inline.getByRole('button', { name: '확인 내용 적용' }).click();
+  await inline.getByRole('button', { name: '답변 저장' }).click();
   actions++;
   expect(actions).toBe(2);
   await page.screenshot({ path: info.outputPath('accuracy-results.png') });
@@ -89,6 +91,8 @@ for (const kind of ['CALC', 'FUND', 'ACTION', 'ALLOC'] as const) {
       const card = panel.locator('.quality-priority .finding').filter({ hasText: '2만 원' }).filter({ hasText: accuracySheet }).first();
       await act(card.getByRole('button', { name: '이 항목 검토', exact: true }).click());
       const detail = page.getByRole('region', { name: '선택 항목 상세 검토' });
+      await act(detail.locator('.review-advanced > summary').click());
+      await act(detail.getByRole('button', { name: '상세 조건 확인·수정' }).click());
       await act(detail.getByRole('checkbox').check());
       await act(detail.getByRole('button', { name: '선택 값 확인·검증 승인' }).click());
     } else {
@@ -164,5 +168,13 @@ for (const kind of ['CALC', 'FUND', 'ACTION', 'ALLOC'] as const) {
     await expect(error).toContainText(kind === 'CALC' ? accuracySheet : 'evaluation.docx');
     console.log('Chrome 조작 측정 ' + JSON.stringify({ kind, operations, scope: '검사 시작 이후, 탐색·입력·확인 포함. 근거 펼치기 제외' }));
     info.annotations.push({ type: 'review-operations', description: `${kind}: ${operations}` });
+    if (kind === 'CALC') {
+      await error.getByRole('button', { name: '확인 내용 수정' }).click();
+      const detail = page.getByRole('region', { name: '선택 항목 상세 검토' });
+      await detail.getByLabel('아니요, 구성이 다르거나 빠진 항목이 있습니다.', { exact: true }).check();
+      await detail.getByRole('button', { name: '답변 저장' }).click();
+      await expect(panel).toContainText('확인된 오류 0');
+      await expect(panel.getByRole('status')).toContainText('구성 수정이 필요');
+    }
   });
 }

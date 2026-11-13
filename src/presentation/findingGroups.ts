@@ -1,6 +1,21 @@
 import type { Finding } from '../inspection/analyze';
 import type { ReviewDecision } from '../inspection/review';
 export type ReviewedFinding = Finding & { decision?: ReviewDecision };
+/** 실제 차이가 있는 결과에만 불일치 유형을 표시한다. 위험도나 판정은 생성하지 않는다. */
+export function findingType(f: ReviewedFinding) {
+  const r = f.approved ?? f.result;
+  const difference =
+    r.difference !== null && r.difference !== 0 && (r.status === '오류' || (r.status !== '검증 통과' && f.signal === '수치 차이'));
+  return f.kind === 'CROSS'
+    ? difference
+      ? '문서 간 수치 차이'
+      : '문서 간 수치 비교'
+    : f.kind === 'CALC'
+      ? difference
+        ? '계산 결과 불일치'
+        : '계산 근거 확인'
+      : '계획 확인 필요';
+}
 export const resultSections = ['확정 오류', '수치 불일치 및 확인 필요', '검증 통과', '검증 대상이지만 정보 부족으로 보류'] as const;
 export type ResultSection = (typeof resultSections)[number];
 /** 승인 판정과 명시적 보류를 구분한다. 자동 수치 일치는 통과로 승격하지 않는다. */

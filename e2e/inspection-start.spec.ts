@@ -40,17 +40,19 @@ test('파일 준비 후 검사 시작 한 번으로 다섯 검토 대상을 표�
   await expect(action.getByText(/본문 문단 13/)).toBeVisible();
   await action.getByText('판단 근거 보기', { exact: true }).click();
   await action.getByRole('button', { name: '이 항목 검토', exact: true }).click();
-  await action.getByRole('button', { name: '예, 같은 ETF와 기간입니다.', exact: true }).click();
+  await action.getByLabel('예, 같은 ETF와 기간입니다.', { exact: true }).check();
+  await action.getByRole('button', { name: '답변 저장' }).click();
   await action.getByRole('button', { name: '이 항목 검토', exact: true }).click();
-  await expect(action.getByRole('button', { name: '예, 같은 ETF와 기간입니다.', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(action.getByLabel('예, 같은 ETF와 기간입니다.', { exact: true })).toBeChecked();
   await expect(panel).toContainText('확인된 오류 0');
   await page.getByRole('button', { name: '2. 검사 결과', exact: true }).click();
-  await expect(action.getByRole('button', { name: '예, 같은 ETF와 기간입니다.', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  // 모르는 조건은 단 한 번의 답변으로 보류하며 확정 오류를 만들지 않는다.
+  await expect(action.getByLabel('예, 같은 ETF와 기간입니다.', { exact: true })).toBeChecked();
+  // 모르는 조건은 선택·저장으로 보류하며 확정 오류를 만들지 않는다.
   for (const kind of ['action', 'allocation', 'fund']) {
     const card = priority.locator(`.finding[data-review-kind="${kind}"]`);
     if (kind !== 'action') await card.getByRole('button', { name: '이 항목 검토', exact: true }).click();
-    await card.getByRole('button', { name: '확인할 수 없습니다.', exact: true }).click();
+    await card.getByLabel('확인할 수 없습니다.', { exact: true }).check();
+    await card.getByRole('button', { name: '답변 저장' }).click();
     await expect(card).toHaveCount(0);
     await expect(panel).toContainText('확인된 오류 0');
   }

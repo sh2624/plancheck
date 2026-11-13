@@ -4,7 +4,8 @@ import type { Recommendation } from '../recommendations/types';
 import type { Candidate } from '../normalization/types';
 import type { Result } from '../validation/types';
 import type { ReviewChoice, InlineAnswers } from '../inspection/review';
-import { groupFindings, findingSection, resultSections, type ReviewedFinding } from '../presentation/findingGroups';
+import { inlineRequirements } from '../inspection/review';
+import { groupFindings, findingSection, findingType, resultSections, type ReviewedFinding } from '../presentation/findingGroups';
 import { formatFinancial } from '../presentation/format';
 import { groupDiscoveries } from '../presentation/discoveries';
 import { compoundReview, readableBasis } from '../presentation/compoundReview';
@@ -12,6 +13,7 @@ import { comparisonFormat, comparisonReviewStatus } from '../presentation/compar
 import { candidateValue } from '../presentation/workflow';
 import { RecommendationDetail } from './RecommendationCenter';
 import { InlineReview } from './InlineReview';
+import { QuestionReview } from './QuestionReview';
 import { Button } from './ui/button';
 import { reviewQuality, filterQuality, contextMismatch, qualityTiers } from '../inspection/quality';
 import { fieldLabels } from '../normalization/types';
@@ -40,8 +42,16 @@ type Props = InspectionInput & {
   onPlanReview?: (finding: ReviewedFinding, choice: ReviewChoice) => void;
 };
 function explanation(f: ReviewedFinding) {
-  if (f.decision?.reviewOnly && f.decision.choice === 'same')
-    return '같은 기준이라는 답변을 저장했습니다. 원문 조건은 유지하며, 미확인 또는 상충된 조건의 최종 오류 판정은 보류합니다.';
+  if (!f.approved && f.decision?.reviewOnly && f.decision.choice === 'same') {
+    const need = inlineRequirements(f.result.evidence);
+    const remaining = [
+      need.asOf || need.scenario ? '비교 기준' : '',
+      need.period ? '적용 기간' : '',
+      need.units.length ? '단위' : '',
+      need.certainty ? '확정 여부' : '',
+    ].filter(Boolean);
+    return `같은 기준이라는 답변을 저장했습니다. ${remaining.length ? `${remaining.join('·')}는 상세 검토에서 확인하세요.` : '최종 승인은 상세 검토에서 별도로 진행합니다.'}`;
+  }
   if (f.decision?.choice === 'different')
     return '다른 조건의 값으로 분류했습니다. 원래 수치 차이는 유지하며 확정 오류로 비교하지 않습니다.';
   if (f.decision?.choice === 'unknown') return '원본 조건을 확인할 수 없어 보류했습니다. 원래 수치 차이와 근거는 유지합니다.';
@@ -54,6 +64,24 @@ function explanation(f: ReviewedFinding) {
       ? '두 값의 대상과 비교 기준이 같은지 확인해 주세요.'
       : '숫자만으로 동일 항목을 확정하지 않습니다. 관계와 적용 기준을 확인해 주세요.'
     : '계산에 포함된 항목과 적용 조건을 확인해 주세요.';
+}
+/** 계산 범위의 검토 답변만 기존 결정 모델에 기록한다. 범위·수치 승인을 대신하지 않는다. */
+function calculationPrompt(f: ReviewedFinding) {
+  if (f.kind !== 'CALC' || !f.recommendation?.calculation) return;
+  return {
+    title: f.title,
+    question: '계산에 포함된 항목이 빠짐없이 같은 범위에 해당하나요?',
+    choices: {
+      same: '예, 구성 범위를 확인했습니다.',
+      different: '아니요, 구성이 다르거나 빠진 항목이 있습니다.',
+      unknown: '확인할 수 없습니다.',
+    },
+    responses: {
+      same: '구성 범위에 대한 답변을 저장했습니다. 수치·기간·확정 여부의 최종 승인은 상세 검토에서 별도로 확인합니다.',
+      different: '구성 수정이 필요하다는 답변을 저장했습니다. 기존 계산 근거를 보존하며 상세 검토에서 항목을 수정할 수 있습니다.',
+      unknown: '구성 범위를 확인할 수 없다는 답변을 저장했습니다. 최종 오류 판정은 보류합니다.',
+    },
+  };
 }
 /** 독립적인 우선 발견을 먼저 보여주고 추가·파생·보류 기록도 근거별로 유지한다. */
 export function InspectionResults(props: Props) {
@@ -70,6 +98,7 @@ export function InspectionResults(props: Props) {
     [openSupports, setOpenSupports] = useState<Record<string, boolean>>({});
   const detailRef = useRef<HTMLElement>(null),
     feedbackRef = useRef<HTMLElement>(null),
+    feedbackPending = useRef(false),
     rootRef = useRef<HTMLElement>(null);
   useEffect(() => {
     if (selected) {
@@ -87,14 +116,17 @@ export function InspectionResults(props: Props) {
   const tierEntries = (tier: string) => representatives.filter((e) => e.tier === tier);
   const fields: string[] = [...new Set<string>(quality.map((e) => e.finding.result.evidence[0]?.field ?? 'planning'))];
   const reviewed = findings.find((f) => f.id === lastReviewed && f.decision);
-  const reviewedSummary = reviewed ? compoundReview(reviewed, props.planning, props.references) : undefined;
+  const reviewedSummary = reviewed
+    ? (compoundReview(reviewed, props.planning, props.references) ?? calculationPrompt(reviewed))
+    : undefined;
   const reviewedChoice = reviewed?.decision?.choice;
   useEffect(() => {
-    if (lastReviewed && reviewedChoice) {
+    if (!selected && feedbackPending.current && lastReviewed && reviewedChoice) {
+      feedbackPending.current = false;
       feedbackRef.current?.scrollIntoView?.({ block: 'nearest' });
       feedbackRef.current?.focus();
     }
-  }, [lastReviewed, reviewedChoice]);
+  }, [lastReviewed, reviewedChoice, selected]);
   function close(id: string) {
     setSelected('');
     setFollowId(id);
@@ -109,7 +141,6 @@ export function InspectionResults(props: Props) {
       section = findingSection(f),
       entry = qualityMap.get(f.id)!;
     const summary = compoundReview(f, props.planning, props.references);
-    const inlineCompound = !!summary && !!props.onPlanReview;
     const discovery = discoveries.find((d) => d.members.some((e) => e.finding === f));
     const supports = detailed ? [] : (discovery?.members.filter((e) => e.finding !== f) ?? []);
     const supportFollow = supports.some((e) => e.occurrences.some((record) => record.id === followId));
@@ -133,6 +164,8 @@ export function InspectionResults(props: Props) {
             )
         : undefined;
     const valueEvidence = comparison?.result.evidence ?? r.evidence;
+    const reviewPrompt = summary ?? (!comparison ? calculationPrompt(f) : undefined);
+    const inlineCompound = !!reviewPrompt && !!props.onPlanReview && !complex;
     const reviewFinding = comparison ?? f;
     const decision = f.decision ?? comparison?.decision;
     const formatted = comparisonFormat(valueEvidence, r.unit);
@@ -142,10 +175,10 @@ export function InspectionResults(props: Props) {
         : f.title;
     const proofEvidence = [...new Map([...r.evidence, ...(comparison?.result.evidence ?? [])].map((c) => [c.id, c])).values()];
     const status =
-      summary && f.decision
+      !f.approved && reviewPrompt && f.decision
         ? f.decision.choice === 'same'
           ? '답변 기록 · 확인 필요'
-          : summary.kind === 'fund' && f.decision.choice === 'different'
+          : summary?.kind === 'fund' && f.decision.choice === 'different'
             ? '미확정 답변 · 추가 확인'
             : '답변 보류 · 확인 필요'
         : !f.approved && decision?.reviewOnly && decision.choice === 'same'
@@ -168,6 +201,7 @@ export function InspectionResults(props: Props) {
         key={f.id}
         tabIndex={-1}
       >
+        <p className="finding-type">{findingType(f)}</p>
         <div className="finding-heading">
           <h3>
             {summary
@@ -265,60 +299,47 @@ export function InspectionResults(props: Props) {
             {f.decision?.choice === 'same' ? '관계 답변을 기록했습니다. 최종 판정에 필요한 조건을 확인하세요.' : summary.question}
           </p>
         )}
-        <div className="finding-actions">
-          <Button
-            onClick={() => {
-              if (inlineCompound) {
-                setSelected(f.id);
-              } else if (f.relationship?.blocked) {
-                onInspect(r.evidence.map((c) => c.id));
-              } else if (f.recommendation) {
-                setSelected(f.id);
-                setComplex(!reviewFinding.recommendation?.link);
-              } else props.onPrepare(r);
-            }}
-          >
-            {f.relationship?.blocked ? '문서 내용 확인·수정' : f.approved ? '확인 내용 수정' : '이 항목 검토'}
-          </Button>
-        </div>
-        {selected === f.id && summary && props.onPlanReview && (
+        {selected !== f.id && (
+          <div className="finding-actions">
+            <Button
+              onClick={() => {
+                if (reviewPrompt && props.onPlanReview) {
+                  setComplex(false);
+                  setSelected(f.id);
+                } else if (f.relationship?.blocked) {
+                  onInspect(r.evidence.map((c) => c.id));
+                } else if (f.recommendation) {
+                  setSelected(f.id);
+                  setComplex(!reviewFinding.recommendation?.link);
+                } else props.onPrepare(r);
+              }}
+            >
+              {f.relationship?.blocked ? '문서 내용 확인·수정' : f.approved ? '확인 내용 수정' : '이 항목 검토'}
+            </Button>
+          </div>
+        )}
+        {selected === f.id && inlineCompound && reviewPrompt && props.onPlanReview && (
           <section ref={detailRef} tabIndex={-1} className="focused-review compound-review" aria-label="선택 항목 상세 검토">
-            <fieldset>
-              <legend>{summary.question}</legend>
-              <div className="compound-choices">
-                {(['same', 'different', 'unknown'] as const).map((choice) => (
-                  <Button
-                    key={choice}
-                    variant="outline"
-                    aria-pressed={f.decision?.choice === choice}
-                    onClick={() => {
-                      props.onPlanReview?.(f, choice);
-                      setLastReviewed(f.id);
-                      setSelected('');
-                    }}
-                  >
-                    {summary.choices[choice]}
-                  </Button>
-                ))}
-              </div>
-            </fieldset>
-            <p className="compound-review-note">
-              답변은 검토 상태만 기록합니다. 지급·수령·날짜 등 개별 정보나 최종 오류 판정을 자동 승인하지 않습니다.
-            </p>
-            <div className="finding-actions">
-              <Button
-                variant="outline"
-                onClick={() => {
+            <QuestionReview
+              question={reviewPrompt.question}
+              choices={reviewPrompt.choices}
+              value={f.decision?.choice}
+              onSave={(choice) => {
+                feedbackPending.current = true;
+                props.onPlanReview?.(f, choice);
+                setLastReviewed(f.id);
+                setSelected('');
+                setFollowId(f.id);
+              }}
+              onAdvanced={() => {
+                if (f.kind === 'CALC') setComplex(true);
+                else {
                   setSelected('');
                   props.onPrepare(r);
-                }}
-              >
-                상세 조건 확인·수정
-              </Button>
-              <Button variant="outline" onClick={() => close(f.id)}>
-                닫기
-              </Button>
-            </div>
+                }
+              }}
+              onClose={() => close(f.id)}
+            />
           </section>
         )}
         {selected === f.id && !inlineCompound && reviewFinding.recommendation && (
@@ -330,7 +351,12 @@ export function InspectionResults(props: Props) {
                 items={props.items}
                 onApply={(choice, answers) => {
                   const issues = props.onInlineReview(reviewFinding.recommendation!, choice, answers);
-                  if (!issues.length) close(f.id);
+                  if (!issues.length) {
+                    feedbackPending.current = true;
+                    setLastReviewed(reviewFinding.id);
+                    setSelected('');
+                    setFollowId(f.id);
+                  }
                   return issues;
                 }}
                 onComplex={() => setComplex(true)}
@@ -461,13 +487,14 @@ export function InspectionResults(props: Props) {
         <strong>확인된 오류 {discoveries.filter((d) => d.members.some((e) => e.finding.approved?.status === '오류')).length}</strong>
         <span>우선 확인할 문제 {discoveries.filter((d) => d.representative.tier === qualityTiers[0]).length}개</span>
       </div>
-      {reviewed && reviewedSummary && reviewed.decision && (
+      {reviewed && reviewed.decision && (
         <aside ref={feedbackRef} tabIndex={-1} className="compound-feedback" role="status">
-          <strong>{reviewedSummary.title}</strong>
-          <p>{reviewedSummary.responses[reviewed.decision.choice]}</p>
+          <strong>{reviewedSummary?.title ?? reviewed.title}</strong>
+          <p>{reviewedSummary && !reviewed.approved ? reviewedSummary.responses[reviewed.decision.choice] : explanation(reviewed)}</p>
           <Button
             variant="outline"
             onClick={() => {
+              setComplex(false);
               setFollowId(reviewed.id);
               setSelected(reviewed.id);
             }}

@@ -69,14 +69,16 @@ for (const kind of ['allocation', 'fund', 'action'] as const)
       const card = screen.getByRole('heading', { name: summary.title }).closest('article')!;
       expect(card.querySelector(':scope > .finding-description')?.textContent).not.toContain(initial.result.references![0].originalText);
       fireEvent.click(within(card).getByRole('button', { name: '이 항목 검토', exact: true }));
-      fireEvent.click(screen.getByRole('button', { name: summary.choices[choice], exact: true }));
+      fireEvent.click(screen.getByLabelText(summary.choices[choice], { exact: true }));
+      expect(onPlanReview).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole('button', { name: '답변 저장' }));
       expect(onPlanReview).toHaveBeenCalledWith(initial, choice);
       expect(screen.getByRole('status').textContent).toContain(summary.responses[choice]);
       expect(screen.getByText('확인된 오류 0')).toBeTruthy();
       expect(onApply).not.toHaveBeenCalled();
       expect(onEdit).not.toHaveBeenCalled();
       fireEvent.click(screen.getByRole('button', { name: '이 답변 다시 검토' }));
-      expect(screen.getByRole('button', { name: summary.choices[choice], exact: true }).getAttribute('aria-pressed')).toBe('true');
+      expect((screen.getByLabelText(summary.choices[choice], { exact: true }) as HTMLInputElement).checked).toBe(true);
       expect(initial.approved).toBeUndefined();
     });
   }

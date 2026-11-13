@@ -45,6 +45,7 @@ test('검사 시작만으로 차이를 발견하고 선택 검토 후에만 확�
   await credit.getByRole('button', { name: '이 항목 검토' }).click();
   let detail = page.getByRole('region', { name: '선택 항목 상세 검토' });
   await expect(detail).toContainText('같은 기준으로 작성된 값');
+  await detail.locator('.review-advanced > summary').click();
   await detail.getByRole('button', { name: '고급 편집·개별 승인' }).click();
   await expect(detail.getByLabel('추천 숫자')).toHaveCount(2);
   await detail.getByRole('checkbox').check();
@@ -57,6 +58,7 @@ test('검사 시작만으로 차이를 발견하고 선택 검토 후에만 확�
   await expect(results).toContainText('확인된 오류 0');
   await credit.getByRole('button', { name: '확인 내용 수정' }).click();
   detail = page.getByRole('region', { name: '선택 항목 상세 검토' });
+  await detail.locator('.review-advanced > summary').click();
   await detail.getByRole('button', { name: '고급 편집·개별 승인' }).click();
   for (const row of await detail.locator('tbody tr').all()) {
     await row.getByLabel('추천 기준일', { exact: true }).fill('2026-10-31');

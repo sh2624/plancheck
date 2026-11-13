@@ -1018,7 +1018,7 @@ footer {
 
 /* 검수 결과의 공통 간격과 좁은 화면 줄바꿈 */
 main {
-  max-width: 1440px;
+  max-width: 1560px;
 }
 .inspection-results {
   border: 0;
@@ -1462,6 +1462,37 @@ small,
   color: #334155;
   font-size: 14px;
   line-height: 1.55;
+}
+.finding-type {
+  font-size: 13px;
+  color: #526174;
+  margin: 0 0 6px;
+}
+.review-advanced {
+  margin-top: 20px;
+  padding-top: 12px;
+  border-top: 1px solid #e2e8f0;
+  font-size: 14px;
+}
+.review-advanced > summary {
+  color: #334155;
+}
+.review-advanced > p {
+  margin: 12px 0;
+  color: #526174;
+  font-size: 13px;
+}
+.question-review fieldset {
+  min-width: 0;
+}
+.compound-choices .inline-choice {
+  font-size: 14px;
+  line-height: 1.6;
+  min-height: 40px;
+  margin: 0;
+  padding: 8px 0;
+  width: 100%;
+  cursor: pointer;
 }
 .compound-review fieldset {
   border: 0;

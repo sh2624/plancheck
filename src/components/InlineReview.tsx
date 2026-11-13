@@ -59,77 +59,107 @@ export function InlineReview({ finding, items, onApply, onComplex, onClose }: Pr
       {choice === 'same' && !advanced && (
         <p>수치 차이의 검토 답변만 기록합니다. 기준일·시나리오가 없거나 다른 경우에도 임의로 채우거나 오류를 확정하지 않습니다.</p>
       )}
-      {choice === 'same' && advanced && (
-        <div className="inline-conditions">
-          {(need.asOf || need.scenario || need.period || need.certainty) && (
-            <p>
-              현재 원문 조건:{' '}
-              {members
-                .map(
-                  (c) =>
-                    `${c.source} 기준일 ${c.asOf || '미확인'}, 시나리오 ${c.scenario || '미확인'}, 적용 기간 ${c.period || '미확인'}, ${c.certainty}`,
-                )
-                .join(' / ')}
-              . 아래 답변은 두 항목에 적용되며 원문은 보존됩니다.
-            </p>
-          )}
-          {need.asOf && (
-            <label>
-              공통 기준일
-              <input value={answers.asOf ?? ''} placeholder="원문을 대조한 기준일" onChange={(e) => patch({ asOf: e.target.value })} />
-            </label>
-          )}
-          {need.scenario && (
-            <label>
-              공통 시나리오
-              <input
-                value={answers.scenario ?? ''}
-                placeholder="원문을 대조한 동일 계획"
-                onChange={(e) => patch({ scenario: e.target.value })}
-              />
-            </label>
-          )}
-          {need.period && (
-            <label>
-              공통 적용 기간
-              <input value={answers.period ?? ''} placeholder="예: 월간" onChange={(e) => patch({ period: e.target.value })} />
-            </label>
-          )}
-          {need.certainty && (
-            <label className="inline-certainty">
-              <input
-                type="checkbox"
-                checked={!!answers.certaintyConfirmed}
-                onChange={(e) => patch({ certaintyConfirmed: e.target.checked })}
-              />
-              두 수치가 확정된 값임을 원문에서 확인했습니다.
-              <small>선택하지 않으면 원래 가정·조건부·미확인 상태를 유지하고 확정 오류 판정을 보류합니다.</small>
-            </label>
-          )}
-          {members
-            .filter((c) => need.units.includes(c.id))
-            .map((c) => (
-              <label key={c.id}>
-                {c.source} 단위 확인
-                <select
-                  value={answers.units?.[c.id] ?? c.unit}
-                  onChange={(e) =>
-                    patch({
-                      units: {
-                        ...answers.units,
-                        [c.id]: e.target.value as Candidate['unit'],
-                      },
-                    })
-                  }
-                >
-                  {units.map((u) => (
-                    <option key={u}>{u}</option>
-                  ))}
-                </select>
-              </label>
-            ))}
+      <div className="finding-actions">
+        <Button disabled={!choice} onClick={() => choice && setIssues(onApply(choice, { recordOnly: true }))}>
+          답변 저장
+        </Button>
+        <Button variant="outline" onClick={onClose}>
+          검토 닫기
+        </Button>
+      </div>
+      <details
+        className="review-advanced"
+        onToggle={(e) => {
+          if (!e.currentTarget.open) setAdvanced(false);
+        }}
+      >
+        <summary>상세 검토</summary>
+        <p>조건 수정과 최종 승인은 답변 저장과 별개입니다.</p>
+        <div className="finding-actions">
+          <Button variant="outline" onClick={() => setAdvanced((v) => !v)}>
+            {advanced ? '조건 입력 접기' : '최종 판정 조건 입력'}
+          </Button>
+          <Button variant="outline" onClick={onComplex}>
+            고급 편집·개별 승인
+          </Button>
         </div>
-      )}
+        {choice === 'same' && advanced && (
+          <div className="inline-conditions">
+            {(need.asOf || need.scenario || need.period || need.certainty) && (
+              <p>
+                현재 원문 조건:{' '}
+                {members
+                  .map(
+                    (c) =>
+                      `${c.source} 기준일 ${c.asOf || '미확인'}, 시나리오 ${c.scenario || '미확인'}, 적용 기간 ${c.period || '미확인'}, ${c.certainty}`,
+                  )
+                  .join(' / ')}
+                . 아래 답변은 두 항목에 적용되며 원문은 보존됩니다.
+              </p>
+            )}
+            {need.asOf && (
+              <label>
+                공통 기준일
+                <input value={answers.asOf ?? ''} placeholder="원문을 대조한 기준일" onChange={(e) => patch({ asOf: e.target.value })} />
+              </label>
+            )}
+            {need.scenario && (
+              <label>
+                공통 시나리오
+                <input
+                  value={answers.scenario ?? ''}
+                  placeholder="원문을 대조한 동일 계획"
+                  onChange={(e) => patch({ scenario: e.target.value })}
+                />
+              </label>
+            )}
+            {need.period && (
+              <label>
+                공통 적용 기간
+                <input value={answers.period ?? ''} placeholder="예: 월간" onChange={(e) => patch({ period: e.target.value })} />
+              </label>
+            )}
+            {need.certainty && (
+              <label className="inline-certainty">
+                <input
+                  type="checkbox"
+                  checked={!!answers.certaintyConfirmed}
+                  onChange={(e) => patch({ certaintyConfirmed: e.target.checked })}
+                />
+                두 수치가 확정된 값임을 원문에서 확인했습니다.
+                <small>선택하지 않으면 원래 가정·조건부·미확인 상태를 유지하고 확정 오류 판정을 보류합니다.</small>
+              </label>
+            )}
+            {members
+              .filter((c) => need.units.includes(c.id))
+              .map((c) => (
+                <label key={c.id}>
+                  {c.source} 단위 확인
+                  <select
+                    value={answers.units?.[c.id] ?? c.unit}
+                    onChange={(e) =>
+                      patch({
+                        units: {
+                          ...answers.units,
+                          [c.id]: e.target.value as Candidate['unit'],
+                        },
+                      })
+                    }
+                  >
+                    {units.map((u) => (
+                      <option key={u}>{u}</option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+          </div>
+        )}
+        {advanced && (
+          <Button disabled={!choice} onClick={() => choice && setIssues(onApply(choice, answers))}>
+            확인 내용 적용
+          </Button>
+        )}
+      </details>
       {choice === 'different' && <p>이 연결의 승인을 해제하고 다른 조건으로 분류합니다. 원래 발견한 수치 차이는 기록에 남습니다.</p>}
       {choice === 'unknown' && <p>이 연결의 승인을 해제하고 미확인으로 보류합니다. 원본과 수치 차이는 계속 확인할 수 있습니다.</p>}
       {issues.length > 0 && (
@@ -139,25 +169,6 @@ export function InlineReview({ finding, items, onApply, onComplex, onClose }: Pr
           ))}
         </ul>
       )}
-      <div className="finding-actions">
-        <Button
-          disabled={!choice}
-          onClick={() => {
-            if (choice) setIssues(onApply(choice, advanced ? answers : { recordOnly: true }));
-          }}
-        >
-          확인 내용 적용
-        </Button>
-        <Button variant="outline" onClick={onComplex}>
-          고급 편집·개별 승인
-        </Button>
-        <Button variant="outline" onClick={() => setAdvanced((v) => !v)}>
-          {advanced ? '간단 검토로 돌아가기' : '최종 판정 조건 입력'}
-        </Button>
-        <Button variant="outline" onClick={onClose}>
-          검토 닫기
-        </Button>
-      </div>
     </div>
   );
 }

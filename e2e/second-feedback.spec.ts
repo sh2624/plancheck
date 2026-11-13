@@ -20,7 +20,7 @@ test('실제 팀원 수치와 배정 관계를 날짜·시나리오 입력 없�
     const detail = page.getByRole('region', { name: '선택 항목 상세 검토', exact: true });
     await detail.getByLabel('예, 같은 기준입니다.', { exact: true }).check();
     await expect(detail.getByRole('textbox')).toHaveCount(0);
-    await detail.getByRole('button', { name: '확인 내용 적용' }).click();
+    await detail.getByRole('button', { name: '답변 저장' }).click();
     await expect(card).toContainText('수치 차이 확인 · 비교 조건 미확인');
     await expect(panel).toContainText('확인된 오류 0');
     await card.getByRole('button', { name: '이 항목 검토', exact: true }).click();
@@ -32,7 +32,8 @@ test('실제 팀원 수치와 배정 관계를 날짜·시나리오 입력 없�
   await allocation.getByRole('button', { name: '이 항목 검토', exact: true }).click();
   const detail = page.getByRole('region', { name: '선택 항목 상세 검토', exact: true });
   await expect(detail.locator('input[type=date]')).toHaveCount(0);
-  await detail.getByRole('button', { name: '예, 같은 예금을 동시에 사용합니다.', exact: true }).click();
+  await detail.getByLabel('예, 같은 예금을 동시에 사용합니다.', { exact: true }).check();
+  await detail.getByRole('button', { name: '답변 저장' }).click();
   await expect(panel.locator('.compound-feedback')).toContainText('동시 사용');
   await expect(panel).toContainText('확인된 오류 0');
   const action = priority.locator('[data-review-kind="action"]');

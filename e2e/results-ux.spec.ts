@@ -20,6 +20,7 @@ test('실제 다섯 결과의 요약·접힌 근거·노트북과 모바일 화�
   const panel = await inspect(page),
     priority = panel.locator('.quality-priority');
   await expect(priority.locator(':scope > .finding')).toHaveCount(5);
+  await expect(priority.locator('.finding-type').filter({ hasText: '계획 확인 필요' })).toHaveCount(3);
   const allocation = priority.locator('[data-review-kind="allocation"]'),
     fund = priority.locator('[data-review-kind="fund"]'),
     action = priority.locator('[data-review-kind="action"]');
@@ -36,7 +37,7 @@ test('실제 다섯 결과의 요약·접힌 근거·노트북과 모바일 화�
   await expect(action.locator('.finding-values')).toContainText('월 15만 원');
   for (const card of [allocation, fund, action]) {
     await expect(card.locator('.finding-proof')).not.toHaveAttribute('open', '');
-    await expect(card.getByRole('button', { name: '확인할 수 없습니다.', exact: true })).toHaveCount(0);
+    await expect(card.getByRole('radio', { name: '확인할 수 없습니다.', exact: true })).toHaveCount(0);
     await expect(card.locator(':scope > .finding-description')).not.toContainText('본문 문단');
     await card.getByText('판단 근거 보기', { exact: true }).click();
     await expect(card.locator('.finding-proof .finding-evidence').first()).toBeVisible();
@@ -57,7 +58,11 @@ test('실제 다섯 결과의 요약·접힌 근거·노트북과 모바일 화�
     await page.screenshot({ path: `.cache/results-ux/${name}.png`, fullPage: true });
   }
   await allocation.getByRole('button', { name: '이 항목 검토', exact: true }).click();
-  const choices = page.locator('.compound-choices button');
+  await expect(
+    page.getByRole('region', { name: '선택 항목 상세 검토', exact: true }).getByRole('button', { name: '답변 저장' }),
+  ).toHaveCount(1);
+  await expect(page.getByRole('button', { name: '상세 조건 확인·수정' })).toHaveCount(0);
+  const choices = page.locator('.compound-choices .inline-choice');
   await expect(choices).toHaveCount(3);
   const bounds = await choices.evaluateAll((elements) =>
     elements.map((el) => {
@@ -88,14 +93,14 @@ for (const [kind, choice, label, response] of [
     const panel = await inspect(page),
       card = panel.locator(`.quality-priority [data-review-kind="${kind}"]`);
     await card.getByRole('button', { name: '이 항목 검토', exact: true }).click();
-    await page.getByRole('region', { name: '선택 항목 상세 검토', exact: true }).getByRole('button', { name: label, exact: true }).click();
+    await page.getByRole('region', { name: '선택 항목 상세 검토', exact: true }).getByLabel(label, { exact: true }).check();
+    await expect(panel.locator('.compound-feedback')).toHaveCount(0);
+    await page.getByRole('region', { name: '선택 항목 상세 검토', exact: true }).getByRole('button', { name: '답변 저장' }).click();
     await expect(panel.locator('.compound-feedback')).toContainText(response);
     await expect(panel.locator('.compound-feedback')).toBeInViewport();
     await expect(panel).toContainText('확인된 오류 0');
     await expect(panel.locator(`.finding[data-review-kind="${kind}"]`)).toHaveCount(1);
     if (choice !== 'same') await expect(card).toHaveCount(0);
     await panel.locator('.compound-feedback').getByRole('button', { name: '이 답변 다시 검토' }).click();
-    await expect(
-      page.getByRole('region', { name: '선택 항목 상세 검토', exact: true }).getByRole('button', { name: label, exact: true }),
-    ).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('region', { name: '선택 항목 상세 검토', exact: true }).getByLabel(label, { exact: true })).toBeChecked();
   });
