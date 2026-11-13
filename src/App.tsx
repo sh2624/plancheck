@@ -463,12 +463,12 @@ export default function App() {
               setStep('review');
             }}
           >
-            3. 상세 검토
+            3. 상세 검토 (선택)
           </Button>
         </nav>
         <p className="muted">
           3단계 중 {step === 'raw' ? 1 : step === 'review' ? 3 : 2}단계 ·{' '}
-          {step === 'raw' ? '검사 시작' : step === 'review' ? '상세 검토' : '검사 결과'}
+          {step === 'raw' ? '검사 시작' : step === 'review' ? '상세 검토 (선택)' : '검사 결과'}
         </p>
         <details className="optional-help">
           <summary>상세 작업 안내</summary>
@@ -481,7 +481,12 @@ export default function App() {
             <Button onClick={next.run}>{next.label}</Button>
           </aside>
         </details>
-        {step === 'raw' && <p className="scope">선택한 문서는 브라우저 안에서만 처리하며 외부로 전송하지 않습니다.</p>}
+        {step === 'raw' && (
+          <div className="scope">
+            <p>선택한 문서는 브라우저 안에서만 처리하며 외부로 전송하지 않습니다.</p>
+            <p>Excel 수식은 재계산하지 않습니다. 최신 계산 결과를 저장한 파일을 사용하세요.</p>
+          </div>
+        )}
         <div className="workspace" hidden={step !== 'raw'}>
           <DocumentPanel
             compact
@@ -598,69 +603,76 @@ export default function App() {
             )}
             <details className="advanced-workspace" open={advancedOpen} onToggle={(e) => setAdvancedOpen(e.currentTarget.open)}>
               <summary>고급 검사 설정·승인 결과</summary>
-              <ResultsView
-                calculationFocus={calculationFocus}
-                onPrepare={prepare}
-                approvalVersion={approvalVersion}
-                recommendationPanel={
-                  <RecommendationCenter
-                    key={recommendationFocus?.request ?? 'recommendations'}
-                    focus={recommendationFocus}
-                    recommendations={recommendations}
-                    items={review.items}
-                    links={review.links}
-                    calculations={calculations}
-                    onEdit={edit}
-                    onApply={apply}
-                    onInspect={inspect}
-                    onPlan={openPlan}
-                  />
-                }
-                sessionPanel={
-                  <SessionReview
-                    getRevision={() => revision.current}
-                    items={review.items}
-                    links={review.links}
-                    documents={documents}
-                    onRestore={(next) => {
-                      revision.current++;
-                      setInlineDecisions({});
-                      setReview(next);
-                      setCalculations((prev) => prev.map((c) => ({ ...c, scopeConfirmed: false })));
-                      setPlanning((prev) => ({
-                        ...prev,
-                        allocations: prev.allocations.map((r) => ({
-                          ...r,
-                          confirmed: false,
-                        })),
-                        funds: prev.funds.map((r) => ({
-                          ...r,
-                          confirmed: false,
-                        })),
-                        actions: prev.actions.map((r) => ({
-                          ...r,
-                          confirmed: false,
-                        })),
-                      }));
-                    }}
-                  />
-                }
-                planFocus={planFocus}
-                planning={planning}
-                references={sourceReferences}
-                onPlanningChange={(next) => {
-                  revision.current++;
-                  setPlanning(next);
-                }}
-                items={review.items}
-                links={review.links}
-                calculations={calculations}
-                onChange={(next) => {
-                  revision.current++;
-                  setCalculations(next);
-                }}
-                onInspect={inspect}
-              />
+              {!registered.XLSX && !registered.DOCX && review.items.length === 0 ? (
+                <div className="empty">
+                  <p>아직 검사할 문서가 없습니다. 문서를 등록하고 검사를 시작하면 결과를 표시합니다.</p>
+                  <Button onClick={() => register('XLSX')}>문서 등록하기</Button>
+                </div>
+              ) : (
+                <ResultsView
+                  calculationFocus={calculationFocus}
+                  onPrepare={prepare}
+                  approvalVersion={approvalVersion}
+                  recommendationPanel={
+                    <RecommendationCenter
+                      key={recommendationFocus?.request ?? 'recommendations'}
+                      focus={recommendationFocus}
+                      recommendations={recommendations}
+                      items={review.items}
+                      links={review.links}
+                      calculations={calculations}
+                      onEdit={edit}
+                      onApply={apply}
+                      onInspect={inspect}
+                      onPlan={openPlan}
+                    />
+                  }
+                  sessionPanel={
+                    <SessionReview
+                      getRevision={() => revision.current}
+                      items={review.items}
+                      links={review.links}
+                      documents={documents}
+                      onRestore={(next) => {
+                        revision.current++;
+                        setInlineDecisions({});
+                        setReview(next);
+                        setCalculations((prev) => prev.map((c) => ({ ...c, scopeConfirmed: false })));
+                        setPlanning((prev) => ({
+                          ...prev,
+                          allocations: prev.allocations.map((r) => ({
+                            ...r,
+                            confirmed: false,
+                          })),
+                          funds: prev.funds.map((r) => ({
+                            ...r,
+                            confirmed: false,
+                          })),
+                          actions: prev.actions.map((r) => ({
+                            ...r,
+                            confirmed: false,
+                          })),
+                        }));
+                      }}
+                    />
+                  }
+                  planFocus={planFocus}
+                  planning={planning}
+                  references={sourceReferences}
+                  onPlanningChange={(next) => {
+                    revision.current++;
+                    setPlanning(next);
+                  }}
+                  items={review.items}
+                  links={review.links}
+                  calculations={calculations}
+                  onChange={(next) => {
+                    revision.current++;
+                    setCalculations(next);
+                  }}
+                  onInspect={inspect}
+                />
+              )}
             </details>
           </>
         )}

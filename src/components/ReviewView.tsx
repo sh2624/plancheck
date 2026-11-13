@@ -86,16 +86,17 @@ export function ReviewView({ coreIds, reasons = [], items, links, onEdit, onConf
           항목 직접 추가
         </Button>
       </div>
-      <p className="notice">
-        필요한 항목만 확인하세요. 기준일·기간·시나리오·항목 유형·확정 여부와 모든 수정 기능은 ‘상세 편집’에 있습니다. 확인되지 않은 값은
-        확정 오류로 판정하지 않습니다.
-      </p>
+      <p className="notice">필요한 항목의 값과 원본을 확인하세요. 값 확인과 검증 승인은 별개입니다.</p>
+      <details className="review-help">
+        <summary>상세 편집·승인 안내</summary>
+        <p>기준일·기간·시나리오·항목 유형·확정 여부와 수정 기능은 각 항목의 ‘상세 편집’에 있습니다.</p>
+        <p>확인되지 않은 값은 확정 오류로 판정하지 않습니다. 전체 후보는 목록 필터의 ‘전체’에서 볼 수 있습니다.</p>
+      </details>
       <BulkUnits items={items} onEdit={onEdit} />
       {coreIds && (
         <p className="review-progress" role="status">
           핵심 확인 진행: {items.filter((c) => coreIds.includes(c.id) && !c.excluded && c.confirmed).length} /{' '}
-          {items.filter((c) => coreIds.includes(c.id) && !c.excluded).length}개 · 값 확인과 검증 승인은 별개입니다. 전체 후보는 목록 필터의
-          ‘전체’에서 볼 수 있습니다.
+          {items.filter((c) => coreIds.includes(c.id) && !c.excluded).length}개
         </p>
       )}
       <div className="review-filters">

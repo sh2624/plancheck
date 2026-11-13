@@ -39,14 +39,17 @@ function audit(page: Page) {
   };
 }
 
-test('자료 없는 화면은 오류가 아니라 검증 준비 중으로 안내한다', async ({ page }) => {
+test('자료 없는 화면은 결과 수를 표시하지 않고 문서 등록으로 안내한다', async ({ page }) => {
   const check = audit(page);
   await page.goto('/');
+  await expect(page.getByText(/Excel 수식은 재계산하지 않습니다/)).toBeVisible();
   await openAdvanced(page);
-  await expect(page.getByRole('button', { name: '오류 0', exact: true })).toBeVisible();
-  await expect(page.getByText('아직 판정할 결과가 없습니다.', { exact: false })).toBeVisible();
-  await page.locator('.preparation-list > summary').click();
-  await expect(page.locator('.preparation-list').getByRole('button', { name: '필요한 항목 확인' }).first()).toBeVisible();
+  await expect(page.getByText(/아직 검사할 문서가 없습니다/)).toBeVisible();
+  await expect(page.getByRole('button', { name: '오류 0', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('region', { name: '검수 결과', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '문서 등록하기', exact: true }).click();
+  await expect(page.getByLabel(/검토할 Excel/)).toBeFocused();
+  await expect(page.getByRole('button', { name: '검사 시작', exact: true })).toBeDisabled();
   check();
 });
 

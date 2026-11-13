@@ -16,14 +16,15 @@ it('금리 표시 잡음을 줄여도 원본 숫자와 작은 금리 값은 보�
   expect(candidateValue({ ...c, number: '0.000001' })).toBe('0.000001%');
   expect(candidateValue({ ...c, number: '' })).toBe('값 미확인 %');
 });
-it('추천이 없는 계산 준비 항목은 실제 계산 구성 편집 위치를 연다', () => {
+it('문서가 없는 고급 화면은 검사 결과나 추천 수 대신 등록 위치로 안내한다', async () => {
   render(<App />);
-  openHelp();
+  expect(screen.getByText(/Excel 수식은 재계산하지 않습니다/)).not.toBeNull();
   openAdvancedResults();
-  fireEvent.click(screen.getByText(/검증 준비 중 5건/));
-  fireEvent.click(screen.getAllByRole('button', { name: '필요한 항목 확인' })[0]);
-  expect(document.querySelector<HTMLDetailsElement>('.calculation-settings')?.open).toBe(true);
-  expect(document.activeElement?.getAttribute('data-calculation')).toBe('assets');
+  expect(screen.getByText(/아직 검사할 문서가 없습니다/)).not.toBeNull();
+  expect(screen.queryByText(/검증 준비 중 5건/)).toBeNull();
+  expect(screen.queryByRole('region', { name: '검수 결과', exact: true })).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: '문서 등록하기' }));
+  await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText(/검토할 Excel/)));
 });
 it('선택한 고급 작업 안내의 단계별 닫기 상태와 다시 열기를 유지한다', () => {
   render(<App />);

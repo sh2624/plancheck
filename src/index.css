@@ -1597,3 +1597,34 @@ small,
     gap: 8px;
   }
 }
+
+.scope p {
+  margin: 4px 0;
+}
+.document-panel-compact .registration-status {
+  margin-block: 12px;
+}
+.review-help {
+  margin: 0 20px 12px;
+  color: #526174;
+  font-size: 13px;
+}
+.review-help p {
+  margin: 8px 0;
+}
+@media (max-width: 800px) {
+  .document-panel-compact .panel-heading,
+  .document-panel-compact .upload {
+    padding: 12px 16px;
+  }
+  .workspace {
+    gap: 16px;
+  }
+}
+
+@media (max-width: 800px) {
+  .steps button {
+    padding-inline: 10px;
+    font-size: 13px;
+  }
+}

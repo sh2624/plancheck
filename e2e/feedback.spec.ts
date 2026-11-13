@@ -44,7 +44,7 @@ test('불명확한 표 단위는 사용자가 범위를 지정하면 다시 계�
   await page.getByRole('button', { name: '검사 시작', exact: true }).click();
   const panel = page.getByRole('region', { name: '자동 검사 결과' });
   await expect(panel.locator('.quality-priority .finding').filter({ hasText: '2만 원' })).toHaveCount(0);
-  await page.getByRole('button', { name: '3. 상세 검토', exact: true }).click();
+  await page.getByRole('button', { name: '3. 상세 검토 (선택)', exact: true }).click();
   await page.getByText('표·열 단위 일괄 지정', { exact: true }).click();
   const bulk = page.locator('.bulk-units');
   const xRange = bulk.getByLabel('단위를 지정할 표').getByRole('option', { name: /^XLSX/ });

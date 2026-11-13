@@ -97,7 +97,7 @@ for (const kind of ['CALC', 'FUND', 'ACTION', 'ALLOC'] as const) {
       await act(detail.getByRole('button', { name: '선택 값 확인·검증 승인' }).click());
     } else {
       if (kind === 'ALLOC') {
-        await act(page.getByRole('button', { name: '3. 상세 검토', exact: true }).click());
+        await act(page.getByRole('button', { name: '3. 상세 검토 (선택)', exact: true }).click());
         // 현재 원본에서 추출한 자산·두 목표만 확인한다. 새 목표를 만들어 검사하지 않는다.
         await act(page.getByLabel('목록 필터').selectOption('전체'));
         for (const name of ['평가예금', '평가비상자금', '평가의료비']) {

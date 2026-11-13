@@ -58,7 +58,7 @@ export function DocumentPanel<T>({ extension, title, parse, children, onData, su
   }
   const Icon = extension === 'xlsx' ? FileSpreadsheet : FileText;
   return (
-    <section className="document-panel" aria-label={title}>
+    <section className={`document-panel${compact ? ' document-panel-compact' : ''}`} aria-label={title}>
       <div className="panel-heading">
         <h2>
           <Icon size={20} aria-hidden />
@@ -121,6 +121,7 @@ export function DocumentPanel<T>({ extension, title, parse, children, onData, su
           children(data)
         )
       ) : (
+        !compact &&
         !busy &&
         !error && (
           <div className="empty">
