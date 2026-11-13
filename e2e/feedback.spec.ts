@@ -18,7 +18,7 @@ for (const assets of [false, true])
     await page.getByRole('button', { name: '검사 시작', exact: true }).click();
     const panel = page.getByRole('region', { name: '자동 검사 결과' });
     await expect(panel).toContainText('확인된 오류 0');
-    await expect(panel.locator('.quality-priority')).toContainText(assets ? '200,000원' : '20,000원');
+    await expect(panel.locator('.quality-priority')).toContainText(assets ? '20만 원' : '2만 원');
     await expect(panel.locator('.quality-priority')).toContainText('확인 필요');
   });
 test('불명확한 표 단위는 사용자가 범위를 지정하면 다시 계산하며 자동 승인하지 않는다', async ({ page }) => {
@@ -43,7 +43,7 @@ test('불명확한 표 단위는 사용자가 범위를 지정하면 다시 계�
   });
   await page.getByRole('button', { name: '검사 시작', exact: true }).click();
   const panel = page.getByRole('region', { name: '자동 검사 결과' });
-  await expect(panel.locator('.quality-priority .finding').filter({ hasText: '20,000원' })).toHaveCount(0);
+  await expect(panel.locator('.quality-priority .finding').filter({ hasText: '2만 원' })).toHaveCount(0);
   await page.getByRole('button', { name: '3. 상세 검토', exact: true }).click();
   await page.getByText('표·열 단위 일괄 지정', { exact: true }).click();
   const bulk = page.locator('.bulk-units');
@@ -53,7 +53,7 @@ test('불명확한 표 단위는 사용자가 범위를 지정하면 다시 계�
   await bulk.getByRole('button', { name: '선택 범위에 단위 적용' }).click();
   await expect(bulk).toContainText('4개 항목');
   await page.getByRole('button', { name: '2. 검사 결과', exact: true }).click();
-  await expect(panel.locator('.quality-priority')).toContainText('20,000원');
+  await expect(panel.locator('.quality-priority')).toContainText('2만 원');
   await expect(panel).toContainText('확인된 오류 0');
 });
 test('팀원 원본의 잉여금·총자산 차이를 발견하고 미래 자산을 우선 오류처럼 비교하지 않는다', async ({ page }) => {
@@ -64,8 +64,8 @@ test('팀원 원본의 잉여금·총자산 차이를 발견하고 미래 자산
   await page.getByRole('button', { name: '검사 시작', exact: true }).click();
   const panel = page.getByRole('region', { name: '자동 검사 결과' }),
     priority = panel.locator('.quality-priority');
-  await expect(priority).toContainText('20,000원');
-  await expect(priority).toContainText('200,000원');
+  await expect(priority).toContainText('2만 원');
+  await expect(priority).toContainText('20만 원');
   await expect(priority).not.toContainText('4,100,000원');
   await expect(priority).not.toContainText('5,000,000원');
   await expect(panel).toContainText('확인된 오류 0');

@@ -23,8 +23,8 @@ test('실제 다섯 결과의 요약·접힌 근거·노트북과 모바일 화�
   const allocation = priority.locator('[data-review-kind="allocation"]'),
     fund = priority.locator('[data-review-kind="fund"]'),
     action = priority.locator('[data-review-kind="action"]');
-  await expect(priority).toContainText('20,000원');
-  await expect(priority).toContainText('200,000원');
+  await expect(priority).toContainText('2만 원');
+  await expect(priority).toContainText('20만 원');
   await expect(allocation).toContainText('590만 원');
   await expect(allocation).toContainText('890만 원');
   await expect(allocation).toContainText('300만 원 부족');
@@ -74,8 +74,8 @@ test('실제 다섯 결과의 요약·접힌 근거·노트북과 모바일 화�
   await expect(panel.getByRole('region', { name: '상세 분석 기록', exact: true })).toBeVisible();
 });
 for (const [kind, choice, label, response] of [
-  ['allocation', 'same', '예, 같은 자금입니다.', '같은 자금이라는 답변을 기록했습니다.'],
-  ['allocation', 'different', '아니요, 다른 자금이거나 시점이 다릅니다.', '다른 자금 또는 시점으로 보류했습니다.'],
+  ['allocation', 'same', '예, 같은 예금을 동시에 사용합니다.', '같은 자금·동시 사용이라는 답변을 기록했습니다.'],
+  ['allocation', 'different', '아니요, 다른 자금이나 사용 시점입니다.', '다른 자금 또는 시점으로 보류했습니다.'],
   ['allocation', 'unknown', '확인할 수 없습니다.', '자금·사용 시점을 확인할 수 없어 보류했습니다.'],
   ['fund', 'same', '예, 조건과 반영 시점이 확인됐습니다.', '조건·시점에 대한 답변을 기록했습니다.'],
   ['fund', 'different', '아니요, 아직 확정되지 않았습니다.', '아직 확정되지 않았다는 답변으로 보류했습니다.'],

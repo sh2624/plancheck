@@ -1,6 +1,6 @@
 import type { ReviewedFinding } from './findingGroups';
 import type { Planning, PlanAction } from '../planning/types';
-import type { EvidenceRef } from '../validation/types';
+import type { EvidenceRef, Result } from '../validation/types';
 import type { ReviewChoice } from '../inspection/review';
 import { normalize } from '../normalization/values';
 import { formatFinancial } from './format';
@@ -15,6 +15,29 @@ export type CompoundReview = {
 };
 const key = (ref: EvidenceRef) => JSON.stringify([ref.source, ref.fileName, ref.location, ref.originalText]);
 const money = (n: number | null) => (n === null ? '금액 미확인' : formatFinancial(n / 10000, '만 원'));
+/** 빈 날짜·시나리오를 구분자로 직렬화하지 않고 기존 원본 행을 읽는 설명만 만든다. */
+export function readableBasis(result: Result, planning: Planning, refs: EvidenceRef[]) {
+  if (result.code !== 'PLAN_CONFLICT') return result.basis;
+  const rows = planning.actions.filter(
+    (row) => result.id === `action:${row.id}` || result.id.startsWith(`actions:${row.id}:`) || result.id.endsWith(`:${row.id}`),
+  );
+  const sentences = rows.map((row) => {
+    const amount = row.amount.trim()
+      ? money(['원', '만 원', '억 원'].includes(row.unit) ? normalize(row.amount, row.unit) : null)
+      : '금액 미기재';
+    const period =
+      row.start && row.end
+        ? `${row.start}부터 ${row.end}까지`
+        : row.start
+          ? `${row.start}부터 · 종료일 미확인`
+          : row.end
+            ? `${row.end}까지 · 시작일 미확인`
+            : '적용 기간 미확인';
+    const monthly = /월\s*\d[\d,]*(?:\.\d+)?\s*(?:만\s*원|억\s*원|원)/.test(row.references.map((ref) => ref.originalText).join(' '));
+    return `${stage(row, refs)}: ${row.targetId || '대상 미확인'} ${monthly ? '월 ' : ''}${amount} ${row.action}. ${period}${row.scenario.trim() ? ` · 시나리오 ${row.scenario}` : ''}`;
+  });
+  return `${sentences.join('. ')}${sentences.length ? '. ' : ''}같은 대상의 적용 기간과 행동을 비교합니다. 조건이 다르거나 미확인이면 충돌을 확정하지 않습니다.`;
+}
 /** 근거의 실제 앞선 단계 제목만 표시한다. 단계가 없으면 제안/실행만 표시한다. */
 function stage(row: PlanAction, refs: EvidenceRef[]) {
   const ref = row.references[0];
@@ -53,9 +76,13 @@ export function compoundReview(f: ReviewedFinding, planning: Planning, refs: Evi
           ? '사용 시점과 자금 출처를 확인해야 합니다.'
           : `동일한 시점에 사용한다면 ${money(Math.abs(r.difference))} 부족합니다.`,
       question: deposit ? '두 목표에 같은 예금을 같은 시점에 사용하나요?' : '여러 목표에 같은 자금을 같은 시점에 사용하나요?',
-      choices: { same: '예, 같은 자금입니다.', different: '아니요, 다른 자금이거나 시점이 다릅니다.', unknown: '확인할 수 없습니다.' },
+      choices: {
+        same: deposit ? '예, 같은 예금을 동시에 사용합니다.' : '예, 같은 자금을 동시에 사용합니다.',
+        different: '아니요, 다른 자금이나 사용 시점입니다.',
+        unknown: '확인할 수 없습니다.',
+      },
       responses: {
-        same: '같은 자금이라는 답변을 기록했습니다. 사용 기간·보유액 기준 등 남은 조건은 상세 검토에서 확인하세요. 아직 중복 오류 확정은 아닙니다.',
+        same: '같은 자금·동시 사용이라는 답변을 기록했습니다. 정확한 날짜는 생성하지 않았으며, 보유액 기준 등 최종 검증 조건은 아직 미확인입니다.',
         different: '다른 자금 또는 시점으로 보류했습니다. 배정 근거는 유지하며, 필요하면 상세 검토에서 재원·기간을 수정하세요.',
         unknown: '자금·사용 시점을 확인할 수 없어 보류했습니다. 원문에서 재원과 사용 기간을 확인하세요.',
       },

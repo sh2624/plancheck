@@ -13,7 +13,13 @@ test('전체 기록을 유지하며 핵심 독립 발견·재무 항목 필터·
     priority = page.getByRole('region', { name: '우선 검토', exact: true });
   await expect(priority.getByRole('heading', { name: /신용대출 금리.*1.0%p/ })).toBeVisible();
   await expect(priority.getByRole('heading', { name: /학자금대출 잔액.*15,000원/ })).toBeVisible();
-  await expect(priority.getByRole('heading', { name: /잉여금.*23,980원/ })).toBeVisible();
+  await expect(
+    priority
+      .locator('.finding')
+      .filter({ has: page.getByRole('heading', { name: /잉여금/ }) })
+      .filter({ has: page.locator('.finding-comparison').filter({ hasText: '23,980원' }) })
+      .first(),
+  ).toBeVisible();
   const priorityCount = await priority.locator('.finding').count(),
     total = Number((await panel.locator('.analysis-count').textContent())!.match(/전체 (\d+)개/)![1]);
   expect(priorityCount).toBeGreaterThan(0);

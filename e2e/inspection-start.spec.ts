@@ -22,8 +22,8 @@ test('파일 준비 후 검사 시작 한 번으로 다섯 검토 대상을 표�
   await page.getByRole('button', { name: '검사 시작', exact: true }).click();
   const panel = page.getByRole('region', { name: '자동 검사 결과' }),
     priority = panel.locator('.quality-priority');
-  await expect(priority).toContainText('20,000원');
-  await expect(priority).toContainText('200,000원');
+  await expect(priority).toContainText('2만 원');
+  await expect(priority).toContainText('20만 원');
   await expect(priority).toContainText('같은 예금을 두 목표에 사용했을 수 있습니다');
   await expect(priority).toContainText('300만 원 부족');
   await expect(priority).toContainText('ETF 적립 중단과 자동이체 유지 계획');

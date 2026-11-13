@@ -22,6 +22,7 @@ export function planReviewFingerprint(planning: Planning, refs: EvidenceRef[]) {
 }
 export type ReviewChoice = 'same' | 'different' | 'unknown';
 export type InlineAnswers = {
+  recordOnly?: boolean;
   asOf?: string;
   scenario?: string;
   period?: string;
@@ -29,6 +30,7 @@ export type InlineAnswers = {
   units?: Record<string, Candidate['unit']>;
 };
 export type ReviewDecision = {
+  reviewOnly?: boolean;
   planningFingerprint?: string;
   choice: ReviewChoice;
   candidateIds: string[];
@@ -113,6 +115,7 @@ export function applyInlineReview(state: ReviewState, r: Recommendation, choice:
         links: state.links.filter((l) => l.xlsxId !== r.link!.xlsxId || l.docxId !== r.link!.docxId),
       },
       decision: {
+        reviewOnly: answers.recordOnly,
         choice,
         candidateIds: ids,
         fingerprint: reviewFingerprint(state.items, ids),
@@ -132,6 +135,13 @@ export function applyInlineReview(state: ReviewState, r: Recommendation, choice:
     };
   const need = inlineRequirements(pair),
     issues: string[] = [];
+  if (answers.recordOnly)
+    return {
+      ok: true,
+      state,
+      changedIds: [],
+      decision: { choice, candidateIds: ids, fingerprint: reviewFingerprint(state.items, ids), reviewOnly: true },
+    };
   if (need.asOf && !answers.asOf?.trim()) issues.push('원문을 대조해 공통 기준일을 입력하세요.');
   if (need.scenario && !answers.scenario?.trim()) issues.push('원문을 대조해 공통 시나리오를 입력하세요.');
   if (need.period && !answers.period?.trim()) issues.push('공통 적용 기간을 입력하세요.');

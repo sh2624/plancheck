@@ -26,7 +26,7 @@ test('인라인 예·아니요·미확인과 원본 편집이 실제 판정·연
   await expect(card.locator('.finding-values')).toContainText('6.5%');
   await expect(card.getByText(basename(xlsx!), { exact: false })).not.toBeVisible();
   await card.getByRole('button', { name: '이 항목 검토', exact: true }).click();
-  await selected(page).getByLabel('아니요, 다른 조건입니다.', { exact: true }).check();
+  await selected(page).getByLabel('아니요, 기준이 다릅니다.', { exact: true }).check();
   await selected(page).getByRole('button', { name: '확인 내용 적용' }).click();
   card = creditIn(page, '상세 분석 기록');
   await expect(card).toContainText('비교 기준 다름 · 추가 정보 필요');
@@ -39,6 +39,7 @@ test('인라인 예·아니요·미확인과 원본 편집이 실제 판정·연
   await expect(panel(page)).toContainText('확인된 오류 0');
   await card.getByRole('button', { name: '이 항목 검토', exact: true }).click();
   await selected(page).getByLabel('예, 같은 기준입니다.', { exact: true }).check();
+  await selected(page).getByRole('button', { name: '최종 판정 조건 입력' }).click();
   await selected(page).getByRole('button', { name: '확인 내용 적용' }).click();
   await expect(selected(page).getByRole('alert')).toContainText('공통 기준일');
   await expect(panel(page)).toContainText('확인된 오류 0');
@@ -57,6 +58,7 @@ test('인라인 예·아니요·미확인과 원본 편집이 실제 판정·연
   await card.getByRole('button', { name: '확인 내용 수정' }).click();
   await expect(selected(page).getByLabel('예, 같은 기준입니다.', { exact: true })).toBeChecked();
   await selected(page).getByLabel('예, 같은 기준입니다.', { exact: true }).check();
+  await selected(page).getByRole('button', { name: '최종 판정 조건 입력' }).click();
   await expect(selected(page).getByLabel('공통 기준일', { exact: true })).toHaveCount(0);
   await selected(page).getByRole('checkbox').check();
   await selected(page).getByRole('button', { name: '확인 내용 적용' }).click();

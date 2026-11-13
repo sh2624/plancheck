@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Finding } from '../inspection/analyze';
+import type { ReviewedFinding as Finding } from '../presentation/findingGroups';
 import type { Candidate } from '../normalization/types';
 import { units } from '../normalization/types';
 import { inlineRequirements, previouslyApprovedPair, type ReviewChoice, type InlineAnswers } from '../inspection/review';
@@ -16,16 +16,19 @@ export function InlineReview({ finding, items, onApply, onComplex, onClose }: Pr
   const members = finding.recommendation?.candidateIds.map((id) => items.find((c) => c.id === id)).filter((c): c is Candidate => !!c) ?? [];
   const need = inlineRequirements(members);
   const reused = previouslyApprovedPair(finding, items);
-  const [choice, setChoice] = useState<ReviewChoice | ''>(() => (reused ? 'same' : '')),
+  const [choice, setChoice] = useState<ReviewChoice | ''>(() => finding.decision?.choice ?? (reused ? 'same' : '')),
+    [advanced, setAdvanced] = useState(false),
     [answers, setAnswers] = useState<InlineAnswers>({}),
     [issues, setIssues] = useState<string[]>([]);
   const patch = (next: Partial<InlineAnswers>) => {
     setAnswers((prev) => ({ ...prev, ...next }));
     setIssues([]);
   };
-  const question = members[0]?.field.startsWith('loan')
-    ? '두 값은 동일한 대출과 같은 기준일을 나타내나요?'
-    : '두 값은 동일한 항목과 같은 기준일·시나리오를 나타내나요?';
+  const question = !advanced
+    ? `${members.some((c) => c.unit === '%') ? '두 수치는' : '두 금액은'} 같은 기준으로 작성된 값인가요?`
+    : members[0]?.field.startsWith('loan')
+      ? '두 값은 동일한 대출과 같은 기준일을 나타내나요?'
+      : '두 값은 동일한 항목과 같은 기준일·시나리오를 나타내나요?';
   return (
     <div className="inline-review">
       {reused && <p className="review-reused">이 원본 연결은 이미 승인했습니다. 변경할 조건만 확인하세요.</p>}
@@ -34,7 +37,7 @@ export function InlineReview({ finding, items, onApply, onComplex, onClose }: Pr
         {(
           [
             ['same', '예, 같은 기준입니다.'],
-            ['different', '아니요, 다른 조건입니다.'],
+            ['different', '아니요, 기준이 다릅니다.'],
             ['unknown', '확인할 수 없습니다.'],
           ] as const
         ).map(([value, label]) => (
@@ -53,7 +56,10 @@ export function InlineReview({ finding, items, onApply, onComplex, onClose }: Pr
           </label>
         ))}
       </fieldset>
-      {choice === 'same' && (
+      {choice === 'same' && !advanced && (
+        <p>수치 차이의 검토 답변만 기록합니다. 기준일·시나리오가 없거나 다른 경우에도 임의로 채우거나 오류를 확정하지 않습니다.</p>
+      )}
+      {choice === 'same' && advanced && (
         <div className="inline-conditions">
           {(need.asOf || need.scenario || need.period || need.certainty) && (
             <p>
@@ -137,13 +143,16 @@ export function InlineReview({ finding, items, onApply, onComplex, onClose }: Pr
         <Button
           disabled={!choice}
           onClick={() => {
-            if (choice) setIssues(onApply(choice, answers));
+            if (choice) setIssues(onApply(choice, advanced ? answers : { recordOnly: true }));
           }}
         >
           확인 내용 적용
         </Button>
         <Button variant="outline" onClick={onComplex}>
           고급 편집·개별 승인
+        </Button>
+        <Button variant="outline" onClick={() => setAdvanced((v) => !v)}>
+          {advanced ? '간단 검토로 돌아가기' : '최종 판정 조건 입력'}
         </Button>
         <Button variant="outline" onClick={onClose}>
           검토 닫기

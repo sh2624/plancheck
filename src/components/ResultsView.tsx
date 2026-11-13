@@ -13,6 +13,7 @@ import type { EvidenceRef } from '../validation/types';
 import { PlanningEditor } from './PlanningEditor';
 import { candidateValue } from '../presentation/workflow';
 import { formatFinancial } from '../presentation/format';
+import { readableBasis } from '../presentation/compoundReview';
 type Props = {
   calculationFocus?: { id: string; request: string };
   onPrepare?: (result: Result) => void;
@@ -226,7 +227,7 @@ export function ResultsView({
                     )}
                     <details>
                       <summary>계산·판단 근거</summary>
-                      <p>{r.basis}</p>
+                      <p>{readableBasis(r, planning, references)}</p>
                     </details>
                   </td>
                 </tr>
@@ -278,7 +279,7 @@ export function ResultsView({
               검증 준비 이어가기
             </Button>
           )}
-          <p>{detail.basis}</p>
+          <p>{readableBasis(detail, planning, references)}</p>
           {detail.needs.map((n, i) => (
             <p className="warning" key={i}>
               {n}

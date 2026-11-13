@@ -43,8 +43,8 @@ test('팀원 전달본은 설정 없이 두 차이와 실제 원본 근거를 �
   await page.getByRole('button', { name: '검사 시작', exact: true }).click();
   const panel = page.getByRole('region', { name: '자동 검사 결과' }),
     priority = panel.locator('.quality-priority');
-  await expect(priority).toContainText('20,000원');
-  await expect(priority).toContainText('200,000원');
+  await expect(priority).toContainText('2만 원');
+  await expect(priority).toContainText('20만 원');
   await expect(panel).toContainText('확인된 오류 0');
   await expect(page.getByText('선택형 AI 문맥 분석 · Preview 실험', { exact: true })).toHaveCount(0);
   // 같은 발견의 별도 문서 비교 기록을 실제 클릭으로 연다. 연결 승인은 하지 않는다.

@@ -44,7 +44,7 @@ test('검사 시작만으로 차이를 발견하고 선택 검토 후에만 확�
   await credit.screenshot({ path: info.outputPath('automatic-credit.png') });
   await credit.getByRole('button', { name: '이 항목 검토' }).click();
   let detail = page.getByRole('region', { name: '선택 항목 상세 검토' });
-  await expect(detail).toContainText('동일한 대출');
+  await expect(detail).toContainText('같은 기준으로 작성된 값');
   await detail.getByRole('button', { name: '고급 편집·개별 승인' }).click();
   await expect(detail.getByLabel('추천 숫자')).toHaveCount(2);
   await detail.getByRole('checkbox').check();
