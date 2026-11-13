@@ -5,7 +5,10 @@ import { isDateTimeFormat } from '../parsers/numberFormat';
 import { allocationGoals } from './allocationGoals';
 import { emptyContext, readContext, inheritContext, type Context } from './context';
 import { declaredUnits, isHeader, isDateText, resolveUnit, periodOf, type UnitHint } from './unitContext';
-const numeric = /^[+-]?(?:\d[\d,]*(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?\s*(?:억\s*원|만\s*원|원|%|개월|년)?$/i;
+import { amountPattern, compoundAmount } from './amounts';
+import { markRepresentations } from './representations';
+import { headerName } from './unitContext';
+const numeric = /^[+-]?(?:\d[\d,]*(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?\s*(?:억\s*(?:\d[\d,]*(?:\.\d+)?\s*만\s*원|원)|만\s*원|원|%|개월|년)?$/i;
 const token = /[+-]?\d[\d,]*(?:\.\d+)?(?:e[+-]?\d+)?/i;
 const metadata = (text: string) => readContext(text, '', 'paragraph');
 function certainty(text: string): Candidate['certainty'] {
@@ -29,7 +32,10 @@ function candidate(
   period: string,
   note = '',
 ): Candidate {
-  const number = raw.match(token)?.[0] ?? '';
+  const compound = compoundAmount(raw);
+  const malformedCompound = /억\s*\d/.test(raw) && compound === null;
+  const number = compound !== null ? String(compound) : malformedCompound ? '' : (raw.match(token)?.[0] ?? '');
+  if (compound !== null) unit = '원';
   return {
     id: `${source}:${location}:${label}`,
     source,
@@ -37,7 +43,7 @@ function candidate(
     location,
     label,
     originalText: context,
-    originalNumber: number || null,
+    originalNumber: compound !== null || malformedCompound ? raw : number || null,
     number,
     unit,
     normalizedValue: normalize(number, unit),
@@ -171,9 +177,10 @@ export function extractWorkbook(book: Workbook): Candidate[] {
       for (const c of values) {
         const header = headers.get(column(c.address)) ?? '';
         if (/대비|비율|비중|비고|상태|확정|기준일|일자|날짜/.test(header) || temporalCell(c)) continue;
-        const valueField = field ?? classify(header);
+        const roleHeader = /잔액|보유액|납입액|이체액|적립액|지출액|사용액/.test(header);
+        const valueField = roleHeader && field ? classify(`${label} ${header}`) : (field ?? classify(header));
         if (!valueField) continue;
-        const valueLabel = field ? label : `${label} · ${header}`;
+        const valueLabel = field && !roleHeader ? label : `${label} · ${roleHeader ? headerName(header) : header}`;
         const isPercent = !!c.numberFormat?.includes('%');
         if (isPercent && valueField !== 'loanRate') continue;
         const labelUnit = unitOf(valueLabel.match(/[（(]\s*(억\s*원|만\s*원|원|%|개월|년)\s*[）)]/)?.[1] ?? '');
@@ -208,6 +215,7 @@ export function extractWorkbook(book: Workbook): Candidate[] {
                 : '',
         );
         item.originalNumber = c.value || null;
+        item.valueRole = headerName(header);
         item.unitEvidence = {
           ...resolved.evidence,
           locations: resolved.evidence.level === 'cell' ? [`${sheet.name}!${c.address}`] : resolved.evidence.locations,
@@ -238,44 +246,61 @@ export function extractWorkbook(book: Workbook): Candidate[] {
         );
     }
   }
-  return output;
+  return markRepresentations(output);
 }
 /** 문단에서 명시 단위가 있는 수치만 근접 항목명에 연결하고 복잡한 문장은 확인 대상으로 남긴다. */
 function prose(text: string, location: string, fileName: string, globalMeta: Context): Candidate[] {
   const result: Candidate[] = [];
-  const matches = [...text.matchAll(/([+-]?\d[\d,]*(?:\.\d+)?)\s*(억\s*원|만\s*원|원|%|개월)/g)];
+  const matches = [...text.matchAll(amountPattern)];
   for (const match of matches) {
     const index = match.index!;
     const before = text.slice(Math.max(0, index - 45), index);
-    const loanMentions = [...text.slice(0, index).matchAll(/학자금대출|신용대출|전세대출/g)];
+    const loanMentions = [...text.slice(0, index).matchAll(/학자금대출|신용대출|전세(?:자금)?대출/g)];
     const loan = loanMentions.at(-1);
-    const local = before.split(/[,.。;\n]/).at(-1) ?? before;
+    const local = before.split(/(?<!\d)[,.。;\n]|[,.。;\n](?!\d)/).at(-1) ?? before;
     const keywords = [
       ...local.matchAll(
-        /월\s*실수령(?:\s*소득)?|월\s*(?:소득|수입)|월\s*지출|월\s*저축(?:\s*[·ㆍ/]\s*투자)?|고정지출|변동지출|월\s*잉여금?|미배분\s*잉여|여유\s*자금|총자산|자산\s*합계|총부채|부채\s*합계|순자산|예금(?:·적금)?|적금|청약저축|ETF|퇴직연금(?:\(DC\))?|보증금|목표액|결혼자금|비상자금|의료비\s*예비비|전세자금|자금\s*출처|재원/g,
+        /(?:월간?|연간?)\s*순현금흐름|(?:연간?|매월)\s*(?:소득|수입)|세후\s*근로소득|기타소득|총유입(?:\s*합계)?|총유출(?:\s*합계)?|저축\s*및\s*투자|연간\s*저축액|입출금통장|CMA|연금저축|IRP|신용카드\s*미결제액|정기예금|월\s*실수령(?:\s*소득)?|월\s*(?:소득|수입)|월\s*지출|월\s*저축(?:\s*[·ㆍ/]\s*투자)?|고정지출|변동지출|월\s*잉여금?|미배분\s*잉여|여유\s*자금|총자산|자산\s*합계|총부채|부채\s*합계|순자산|예금(?:·적금)?|적금|청약저축|ETF(?:\s*및\s*펀드)?|퇴직연금(?:\(DC\))?|보증금|목표액|결혼자금|비상자금|의료비\s*예비비|전세자금|자금\s*출처|재원/gi,
       ),
     ];
+    keywords.push(...local.matchAll(/연간?\s*원리금\s*상환액/g));
+    keywords.sort((a, b) => a.index! - b.index!);
     const key = keywords.at(-1);
     let label = key?.[0] ?? '',
       field = label ? classify(label) : null;
-    const u = unitOf(match[2]);
+    const u = compoundAmount(match[0]) !== null ? '원' : unitOf(match[0]);
     if (
       loan &&
       index - loan.index! < 160 &&
       ((u === '%' && /연\s*(?:약\s*)?$/.test(before)) ||
         /잔액(?:은|이)?\s*$/.test(before) ||
+        /대출\s*$/.test(before) ||
         /월\s*(?:상환액(?:은)?|약)?\s*$/.test(before) ||
         (u === '개월' && /상환|원리금|대출/.test(text.slice(loan.index!, index))))
     ) {
-      field = u === '%' ? 'loanRate' : u === '개월' ? 'loanTerm' : /잔액/.test(before) ? 'loanBalance' : 'loanPayment';
+      field = u === '%' ? 'loanRate' : u === '개월' ? 'loanTerm' : /잔액|대출\s*$/.test(before) ? 'loanBalance' : 'loanPayment';
       label = `${loan[0]} ${field === 'loanRate' ? '연금리' : field === 'loanBalance' ? '잔액' : field === 'loanTerm' ? '기간' : '월 상환액'}`;
     }
     if (!field || !label || (u === '%' && field !== 'loanRate') || (u === '개월' && field !== 'loanTerm')) continue;
     if (key && !/loan/.test(field) && index - (key.index! + before.lastIndexOf(local) + Math.max(0, index - 45)) > 35) continue;
     if (key && !/loan/.test(field)) {
       const gap = local.slice(key.index! + key[0].length);
-      if (!/^(?:[\s()·:：]|평가액|적립금|잔액|은|는|이|가|약|합계|총액|금액|적립|월|현재|일부|DC)*$/.test(gap)) continue;
-      if (/월/.test(gap) && ['deposit', 'etf', 'pension'].includes(field)) field = 'savings';
+      const subtotalScope = /^(?:으로|로)\s*구성된\s*[가-힣\s]*소계(?:는|가)?\s*$/.test(gap);
+      if (
+        !subtotalScope &&
+        !/^(?:[\s()·:：]|평가액|적립금|잔액|납입액|이체액|적립액|지출액|사용액|은|는|이|가|약|합계|총액|금액|적립|월|연간|현재|일부|DC)*$/.test(
+          gap,
+        )
+      )
+        continue;
+      if (/월/.test(gap) && ['deposit', 'etf', 'pension'].includes(field)) {
+        field = 'savings';
+        label += ' 월';
+      }
+      if (/납입액|이체액|적립액|지출액|사용액/.test(gap)) {
+        field = classify(`${label} ${gap}`) ?? field;
+        label = `${label} ${gap.trim()}`;
+      }
     }
     const future = /(?:\d+\s*(?:년|개월)\s*후)/.exec(before)?.[0];
     result.push(
@@ -284,7 +309,7 @@ function prose(text: string, location: string, fileName: string, globalMeta: Con
         fileName,
         `${location} · 문자 ${index + 1}`,
         label,
-        match[1],
+        match[0],
         field,
         u,
         text,
@@ -293,7 +318,12 @@ function prose(text: string, location: string, fileName: string, globalMeta: Con
           scenario: metadata(text).scenario || globalMeta.scenario,
           evidence: globalMeta.evidence,
         },
-        future ?? (/월/.test(label) || (field === 'savings' && /월/.test(before)) ? '월간' : ''),
+        future ??
+          (/^연간\s*현금흐름/.test(text) &&
+          !/월|매월/.test(label) &&
+          ['income', 'fixedExpense', 'variableExpense', 'savings', 'surplus', 'loanPayment'].includes(field)
+            ? '연간'
+            : periodOf('', label, ['income', 'fixedExpense', 'variableExpense', 'savings', 'surplus', 'loanPayment'].includes(field))),
         '문단 근접 추출 · 수치의 대상과 적용 시점 확인 필요',
       ),
     );
@@ -454,8 +484,7 @@ export function extractWord(doc: WordDocument): Candidate[] {
             periodOf(
               header,
               partLabel,
-              ['income', 'fixedExpense', 'variableExpense', 'savings', 'surplus', 'loanPayment'].includes(partField) &&
-                /월|매월/.test(partLabel),
+              ['income', 'fixedExpense', 'variableExpense', 'savings', 'surplus', 'loanPayment'].includes(partField),
             ),
             resolved.evidence.level === 'conflict'
               ? '단위 선언 충돌 · 원문 범위를 확인하세요'

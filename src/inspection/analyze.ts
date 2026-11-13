@@ -155,7 +155,11 @@ export function inspectDocuments(input: InspectionInput): Finding[] {
               code: `CALC_${rec.calculation.rule.toUpperCase()}`,
               title: ruleTitles[rec.calculation.rule],
               status: '검증 불가',
-              evidence: items.filter((c) => rec.candidateIds.includes(c.id)),
+              evidence: items.filter(
+                (c) =>
+                  rec.candidateIds.includes(c.id) ||
+                  rec.references.some((ref) => ref.source === c.source && ref.fileName === c.fileName && ref.location === c.location),
+              ),
               actual: null,
               expected: null,
               difference: null,
@@ -163,7 +167,10 @@ export function inspectDocuments(input: InspectionInput): Finding[] {
               basis: '추천 구성에 명확한 범위·분류 문제가 있어 자동 계산을 보류합니다.',
               needs: rec.scopeIssues,
             }
-          : discoverCalculation(items, calculations.find((c) => c.id === rec.calculation!.id) ?? rec.calculation),
+          : {
+              ...discoverCalculation(items, calculations.find((c) => c.id === rec.calculation!.id) ?? rec.calculation),
+              references: rec.references,
+            },
         rec,
       );
   }

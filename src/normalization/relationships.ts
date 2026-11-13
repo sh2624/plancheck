@@ -1,4 +1,5 @@
 import type { Candidate } from './types';
+import { recurringConversion } from './periods';
 export type RelationshipAssessment = {
   blocked: boolean;
   reasons: string[];
@@ -27,6 +28,8 @@ function atoms(c: Candidate) {
       ]
     : [
         ['예금', /예금/],
+        ['입출금통장', /입출금통장/],
+        ['CMA', /CMA/i],
         ['적금', /적금/],
         ['청약', /청약/],
         ['투자자산', /ETF|주식/i],
@@ -42,6 +45,11 @@ export function assessRelationship(a: Candidate, b: Candidate): RelationshipAsse
   const reasons: string[] = [],
     x = atoms(a),
     y = atoms(b);
+  if (a.field === 'income') {
+    const kind = (c: Candidate) =>
+      /총유입/.test(c.label) ? '총유입' : /기타소득/.test(c.label) ? '기타소득' : /근로소득/.test(c.label) ? '근로소득' : '';
+    if (kind(a) && kind(b) && kind(a) !== kind(b)) reasons.push('소득 세부 항목과 총유입의 범위가 다릅니다.');
+  }
   const expenseScope = (c: Candidate) =>
     /월\s*(?:총\s*)?지출/.test(c.label) ? '전체 지출' : /고정지출/.test(c.label) ? '고정지출' : /변동지출/.test(c.label) ? '변동지출' : '';
   if (expenseScope(a) && expenseScope(b) && expenseScope(a) !== expenseScope(b))
@@ -60,7 +68,7 @@ export function assessRelationship(a: Candidate, b: Candidate): RelationshipAsse
   if (['deposit', 'etf', 'pension', 'housingDeposit'].includes(a.field) && savingsRow(a) !== savingsRow(b))
     reasons.push('보유 자산과 저축·투자 납입액의 역할이 다릅니다.');
   const periodConflict =
-      (!!a.period.trim() && !!b.period.trim() && period(a.period) !== period(b.period)) ||
+      (!!a.period.trim() && !!b.period.trim() && period(a.period) !== period(b.period) && !recurringConversion(a, b)) ||
       /\d+\s*(?:년|개월)\s*후/.test(a.period) !== /\d+\s*(?:년|개월)\s*후/.test(b.period),
     dateConflict = specificDate(a.asOf) && specificDate(b.asOf) && compact(a.asOf) !== compact(b.asOf),
     scenarioConflict = !!a.scenario.trim() && !!b.scenario.trim() && compact(a.scenario) !== compact(b.scenario);

@@ -3,9 +3,12 @@ import { normalize, compatibleUnit } from '../normalization/values';
 import type { Calculation, Result } from './types';
 import { rules, ruleTitles } from './types';
 import { provisional } from './discovery';
+import { representationSelection } from '../normalization/representations';
+import { recurringConversion } from '../normalization/periods';
 const money = (c: Candidate) => ['원', '만 원', '억 원'].includes(c.unit);
 const compact = (s: string) => s.replace(/\s+/g, '');
 const monthly = (s: string) => ['월', '월간', '매월'].includes(compact(s));
+const annual = (s: string) => ['연', '연간', '매년'].includes(compact(s));
 const flow = (c: Candidate) => ['income', 'fixedExpense', 'variableExpense', 'savings', 'surplus', 'loanPayment'].includes(c.field);
 /** 입력 숫자를 재정규화해 누락·오래된 정규화 값·단위 오류를 검사한다. */
 function inputIssues(items: Candidate[], discovery = false): string[] {
@@ -101,8 +104,9 @@ function evaluateCross(items: Candidate[], links: Link[], discovery = false): Re
         status: '확인 필요',
         needs: ['비교 단위의 차원이 다릅니다.'],
       };
-    const actual = a.normalizedValue! * (a.unit === '년' ? 12 : 1),
-      expected = b.normalizedValue! * (b.unit === '년' ? 12 : 1);
+    const conversion = recurringConversion(a, b);
+    const actual = a.normalizedValue! * (conversion?.a ?? (a.unit === '년' ? 12 : 1)),
+      expected = b.normalizedValue! * (conversion?.b ?? (b.unit === '년' ? 12 : 1));
     const unit = dimension(a),
       difference = actual - expected;
     if (!Number.isFinite(difference) || Math.abs(actual) > Number.MAX_SAFE_INTEGER || Math.abs(expected) > Number.MAX_SAFE_INTEGER)
@@ -114,15 +118,34 @@ function evaluateCross(items: Candidate[], links: Link[], discovery = false): Re
         expected,
         difference,
         unit,
-        basis: `${result.basis} ${actual} ${unit} − ${expected} ${unit} = ${difference} ${unit === '%' ? '%p' : unit}. 허용오차 ${unit === '원' ? 1 : 1e-8} ${unit === '%' ? '%p' : unit}.`,
+        basis: `${result.basis} ${conversion ? `원문에 반복 금액이 명시되어 연간 기준 비교: Excel 원본 ${a.normalizedValue}원 × ${conversion.a}, Word 원본 ${b.normalizedValue}원 × ${conversion.b}. ` : ''}${actual} ${unit} − ${expected} ${unit} = ${difference} ${unit === '%' ? '%p' : unit}. 허용오차 ${unit === '원' ? 1 : 1e-8} ${unit === '%' ? '%p' : unit}.`,
       },
-      contextIssues(evidence, true),
+      contextIssues(evidence, !conversion),
       unit === '원' ? 1 : 1e-8,
     );
   });
 }
 /** 제공된 계산 범위의 공통 계산. 확인 게이트와 원본의 단위·조건 검사를 분리한다. */
 function evaluateCalculation(items: Candidate[], spec: Calculation, discovery = false): Result {
+  const originalIds = Object.values(spec.groups).flat();
+  const duplicateInput = new Set([spec.targetId, ...originalIds]).size !== originalIds.length + 1;
+  const selectedExcluded = items.filter((c) => originalIds.includes(c.id) && c.excluded);
+  const expressionGroups = Object.fromEntries(
+    Object.entries(spec.groups).map(([key, ids]) => [key, representationSelection(items.filter((c) => ids.includes(c.id)))]),
+  );
+  const expressionNotes = Object.values(expressionGroups).flatMap((g) => g.notes);
+  const expressionConflicts = Object.values(expressionGroups).flatMap((g) => g.conflicts);
+  spec = {
+    ...spec,
+    groups: Object.fromEntries(
+      Object.entries(spec.groups).map(([key, ids]) => [
+        key,
+        expressionGroups[key].notes.length
+          ? [...expressionGroups[key].items.map((c) => c.id), ...ids.filter((id) => !items.some((c) => c.id === id))]
+          : ids,
+      ]),
+    ),
+  };
   const config = rules[spec.rule],
     target = items.find((c) => c.id === spec.targetId);
   const selected = config.groups.flatMap((g) => spec.groups[g.key] ?? []);
@@ -131,9 +154,14 @@ function evaluateCalculation(items: Candidate[], spec: Calculation, discovery = 
   const result: Result = {
     id: `calc:${spec.id}`,
     code: `CALC_${spec.rule.toUpperCase()}`,
-    title: ruleTitles[spec.rule],
+    title: spec.rule === 'surplus' && target && annual(target.period) ? '연간 순현금흐름' : ruleTitles[spec.rule],
     status: '검증 불가',
     evidence,
+    references: expressionNotes.length
+      ? items
+          .filter((c) => originalIds.includes(c.id))
+          .map((c) => ({ source: c.source, fileName: c.fileName, location: c.location, originalText: c.originalText }))
+      : undefined,
     actual: target?.normalizedValue ?? null,
     expected: null,
     difference: null,
@@ -142,6 +170,9 @@ function evaluateCalculation(items: Candidate[], spec: Calculation, discovery = 
     needs: [],
   };
   const missing: string[] = [];
+  if (duplicateInput) missing.push('같은 항목을 계산 내에서 중복 선택할 수 없습니다.');
+  missing.push(...selectedExcluded.map((c) => `${c.label}: 제외된 항목`));
+  if (expressionConflicts.length) missing.push(...expressionNotes.filter((s) => s.includes('불일치')));
   if (!target) missing.push(`검사할 ${ruleTitles[spec.rule]} 항목을 선택하세요.`);
   else if (target.field !== config.target) missing.push('검사 대상의 항목 유형을 확인하세요.');
   for (const group of config.groups) {
@@ -175,8 +206,8 @@ function evaluateCalculation(items: Candidate[], spec: Calculation, discovery = 
     needs.push('계산 입력이 서로 다른 문서에 속합니다. 단일 문서의 범위를 선택하세요.');
   const moneyItems = spec.rule === 'loan' ? evidence.filter((c) => !['loanRate', 'loanTerm'].includes(c.field)) : evidence;
   if (moneyItems.some((c) => !money(c))) return { ...result, needs: ['금액 항목의 단위가 올바르지 않습니다.'] };
-  if (spec.rule === 'surplus' && evidence.some((c) => !monthly(c.period)))
-    needs.push('월 잉여금에는 모든 입력을 월간으로 확인해야 합니다. 연간 값을 임의로 월 환산하지 않습니다.');
+  if (spec.rule === 'surplus' && !evidence.every((c) => monthly(c.period)) && !evidence.every((c) => annual(c.period)))
+    needs.push('잉여금에는 모든 입력을 같은 월간 또는 연간으로 확인해야 합니다. 기간을 임의로 환산하지 않습니다.');
   let expected: number | null = null,
     formula = '';
   if (spec.rule === 'assets' || spec.rule === 'debt') {
@@ -191,7 +222,7 @@ function evaluateCalculation(items: Candidate[], spec: Calculation, discovery = 
   }
   if (spec.rule === 'surplus') {
     expected = value('income') - sum('expense') - sum('savings');
-    formula = `월 잉여금 = ${value('income')} − ${sum('expense')} − ${sum('savings')}`;
+    formula = `${annual(target!.period) ? '연간 순현금흐름' : '월 잉여금'} = ${value('income')} − ${sum('expense')} − ${sum('savings')}`;
   }
   if (spec.rule === 'loan') {
     const principal = get('principal')[0],
@@ -228,7 +259,7 @@ function evaluateCalculation(items: Candidate[], spec: Calculation, discovery = 
       ...result,
       expected,
       difference,
-      basis: `${formula} = ${expected}원. 차이 ${difference}원. 허용오차 ${tolerance}원.`,
+      basis: `${formula} = ${expected}원. 차이 ${difference}원. 허용오차 ${tolerance}원. ${expressionNotes.join(' ')}`.trim(),
     },
     needs,
     tolerance,

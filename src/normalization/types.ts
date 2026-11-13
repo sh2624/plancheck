@@ -26,6 +26,8 @@ export type Field = keyof typeof fieldLabels;
 export const units = ['원', '만 원', '억 원', '%', '개월', '년', '미확인'] as const;
 export type Unit = (typeof units)[number];
 export type Candidate = {
+  valueRole?: string;
+  representation?: { key: string; memberIds: string[] };
   contextEvidence?: import('./context').ContextEvidence[];
   unitEvidence?: import('./unitContext').UnitEvidence;
   id: string;

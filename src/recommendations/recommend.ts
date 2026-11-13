@@ -8,8 +8,10 @@ import { newRecord } from '../planning/types';
 import { dateValue } from '../planning/engine';
 import type { Planning } from '../planning/types';
 import { coreFields } from './types';
+import { representationSelection } from '../normalization/representations';
 import type { Recommendation } from './types';
 const monthly = (s: string) => ['월', '월간', '매월'].includes(s.trim());
+const annual = (s: string) => ['연', '연간', '매년'].includes(s.trim());
 const active = (c: Candidate) => !c.excluded;
 const party = (c: Candidate) => (c.label.match(/본인|고객|어머니|아버지|배우자|자녀/)?.[0] ?? '').replace('고객', '본인');
 const comparable = (c: Candidate) => active(c) && c.normalizedValue !== null && compatibleUnit(c.field, c.unit);
@@ -22,6 +24,7 @@ function sameRegion(a: Candidate, b: Candidate) {
 }
 /** 금액 대신 대출 명칭으로 약정 후보를 구분한다. 이름을 알 수 없으면 연결하지 않는다. */
 export function loanIdentity(c: Candidate): string {
+  if (/신용카드\s*미결제액/.test(c.label)) return '신용카드 미결제액';
   return c.label.match(/(?:^|[\s·])([^\s·()]*(?:대출|학자금)[^\s·()]*)/)?.[1] ?? '';
 }
 const dedupe = (values: string[]) => [...new Set(values)];
@@ -46,17 +49,26 @@ function constituent(items: Candidate[], field: Field) {
 /** 원문 구조가 맞는 계산을 제안하되 범위 확인이나 사용자 확인은 절대 부여하지 않는다. */
 function calculations(items: Candidate[]): Recommendation[] {
   const output: Recommendation[] = [];
+  const representations = representationSelection(items.filter(active));
   for (const rule of Object.keys(rules) as Rule[])
-    for (const target of items.filter((c) => active(c) && c.field === rules[rule].target)) {
-      if (rule === 'surplus' && !monthly(target.period)) continue;
+    for (const target of [...representations.items, ...representations.conflicts].filter((c) => c.field === rules[rule].target)) {
+      if (rule === 'surplus' && !monthly(target.period) && !annual(target.period)) continue;
       if (rule === 'loan' && !monthly(target.period)) continue;
-      const local = items.filter((c) => active(c) && sameRegion(c, target) && c.id !== target.id);
-      const candidates = rule === 'surplus' ? local.filter((c) => monthly(c.period)) : local;
+      const selected = representationSelection(items.filter((c) => active(c) && sameRegion(c, target) && c.id !== target.id));
+      const local = selected.items;
+      const candidates = rule === 'surplus' ? local.filter((c) => (annual(target.period) ? annual(c.period) : monthly(c.period))) : local;
       const spec = newCalculation(rule, `recommended:${rule}:${target.id}`);
       spec.targetId = target.id;
       const risks: string[] = [],
         missing: string[] = [],
         scopeIssues: string[] = [];
+      risks.push(...selected.notes);
+      const requiredFields = rules[rule].groups.flatMap((g) => g.fields);
+      const relevantConflicts = selected.conflicts.filter((c) => requiredFields.includes(c.field));
+      if (relevantConflicts.length)
+        scopeIssues.push(...selected.notes.filter((s) => s.includes('불일치') && relevantConflicts.some((c) => s.includes(c.location))));
+      if (representations.conflicts.some((c) => c.id === target.id))
+        scopeIssues.push(...representations.notes.filter((s) => s.includes('불일치') && s.includes(target.location)));
       if (rule === 'assets')
         spec.groups.parts = candidates
           .filter((c) => ['deposit', 'etf', 'pension', 'housingDeposit'].includes(c.field) && !/[+＋]|소계|합계|참고/.test(c.label))
@@ -70,9 +82,14 @@ function calculations(items: Candidate[]): Recommendation[] {
         spec.groups.debt = candidates.filter((c) => c.field === 'totalDebt').map((c) => c.id);
       }
       if (rule === 'surplus') {
-        spec.groups.income = candidates.filter((c) => c.field === 'income').map((c) => c.id);
+        const income = candidates.filter((c) => c.field === 'income');
+        const inflows = income.filter((c) => /총유입/.test(c.label));
+        spec.groups.income = (inflows.length ? inflows : income).map((c) => c.id);
         spec.groups.expense = [
-          ...constituent(candidates, 'fixedExpense'),
+          ...constituent(
+            candidates.filter((c) => !/총유출/.test(c.label)),
+            'fixedExpense',
+          ),
           ...constituent(candidates, 'variableExpense'),
           ...candidates.filter((c) => c.field === 'loanPayment'),
         ].map((c) => c.id);
@@ -144,7 +161,9 @@ function calculations(items: Candidate[]): Recommendation[] {
         missing,
         confidence: missing.length ? '정보 부족' : '구조 일치',
         primary: rule !== 'loan' || missing.length < 3,
-        references: [],
+        references: items
+          .filter((c) => selected.notes.length && c.representation && sameRegion(c, target))
+          .map((c) => ({ source: c.source, fileName: c.fileName, location: c.location, originalText: c.originalText })),
         scopeIssues,
       });
     }
