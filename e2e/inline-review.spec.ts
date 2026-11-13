@@ -29,15 +29,15 @@ test('인라인 예·아니요·미확인과 원본 편집이 실제 판정·연
   await selected(page).getByLabel('아니요, 기준이 다릅니다.', { exact: true }).check();
   await selected(page).getByRole('button', { name: '답변 저장' }).click();
   card = creditIn(page, '상세 분석 기록');
-  await expect(card).toContainText('비교 기준 다름 · 추가 정보 필요');
+  await expect(card).toContainText('일반 검토 완료 · 오류 미확정');
   await expect(card).toContainText('1.0%p');
   await expect(panel(page)).toContainText('확인된 오류 0');
-  await card.getByRole('button', { name: '이 항목 검토', exact: true }).click();
+  await card.getByRole('button', { name: '답변 수정', exact: true }).click();
   await selected(page).getByLabel('확인할 수 없습니다.', { exact: true }).check();
   await selected(page).getByRole('button', { name: '답변 저장' }).click();
-  await expect(card).toContainText('비교 기준 확인 필요');
+  await expect(card).toContainText('일반 검토 완료 · 판단 보류');
   await expect(panel(page)).toContainText('확인된 오류 0');
-  await card.getByRole('button', { name: '이 항목 검토', exact: true }).click();
+  await card.getByRole('button', { name: '답변 수정', exact: true }).click();
   await selected(page).getByLabel('예, 같은 기준입니다.', { exact: true }).check();
   await selected(page).locator('.review-advanced > summary').click();
   await selected(page).getByRole('button', { name: '최종 판정 조건 입력' }).click();
@@ -54,7 +54,7 @@ test('인라인 예·아니요·미확인과 원본 편집이 실제 판정·연
       has: page.getByRole('heading', { name: /신용대출 금리.*추가 확인/ }),
     })
     .first();
-  await expect(card).toContainText('비교 기준 확인됨 · 확인 필요');
+  await expect(card).toContainText('일반 검토 완료 · 오류 미확정');
   await expect(panel(page)).toContainText('확인된 오류 0');
   await card.getByRole('button', { name: '확인 내용 수정' }).click();
   await expect(selected(page).getByLabel('예, 같은 기준입니다.', { exact: true })).toBeChecked();

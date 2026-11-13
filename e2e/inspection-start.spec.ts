@@ -42,7 +42,7 @@ test('파일 준비 후 검사 시작 한 번으로 다섯 검토 대상을 표�
   await action.getByRole('button', { name: '이 항목 검토', exact: true }).click();
   await action.getByLabel('예, 같은 ETF와 기간입니다.', { exact: true }).check();
   await action.getByRole('button', { name: '답변 저장' }).click();
-  await action.getByRole('button', { name: '이 항목 검토', exact: true }).click();
+  await action.getByRole('button', { name: '답변 수정', exact: true }).click();
   await expect(action.getByLabel('예, 같은 ETF와 기간입니다.', { exact: true })).toBeChecked();
   await expect(panel).toContainText('확인된 오류 0');
   await page.getByRole('button', { name: '2. 검사 결과', exact: true }).click();

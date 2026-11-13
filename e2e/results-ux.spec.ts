@@ -78,16 +78,16 @@ test('실제 다섯 결과의 요약·접힌 근거·노트북과 모바일 화�
   await panel.locator('.quality-records > summary').click();
   await expect(panel.getByRole('region', { name: '상세 분석 기록', exact: true })).toBeVisible();
 });
-for (const [kind, choice, label, response] of [
-  ['allocation', 'same', '예, 같은 예금을 동시에 사용합니다.', '같은 자금·동시 사용이라는 답변을 기록했습니다.'],
-  ['allocation', 'different', '아니요, 다른 자금이나 사용 시점입니다.', '다른 자금 또는 시점으로 보류했습니다.'],
-  ['allocation', 'unknown', '확인할 수 없습니다.', '자금·사용 시점을 확인할 수 없어 보류했습니다.'],
-  ['fund', 'same', '예, 조건과 반영 시점이 확인됐습니다.', '조건·시점에 대한 답변을 기록했습니다.'],
-  ['fund', 'different', '아니요, 아직 확정되지 않았습니다.', '아직 확정되지 않았다는 답변으로 보류했습니다.'],
-  ['fund', 'unknown', '확인할 수 없습니다.', '지급·수령 조건과 반영 시점을 확인할 수 없어 보류했습니다.'],
-  ['action', 'same', '예, 같은 ETF와 기간입니다.', '같은 상품·기간이라는 답변을 기록했습니다.'],
-  ['action', 'different', '아니요, 상품이나 적용 기간이 다릅니다.', '다른 상품 또는 적용 기간으로 보류했습니다.'],
-  ['action', 'unknown', '확인할 수 없습니다.', '상품·기간을 확인할 수 없어 보류했습니다.'],
+for (const [kind, choice, label] of [
+  ['allocation', 'same', '예, 같은 예금을 동시에 사용합니다.'],
+  ['allocation', 'different', '아니요, 다른 자금이나 사용 시점입니다.'],
+  ['allocation', 'unknown', '확인할 수 없습니다.'],
+  ['fund', 'same', '예, 조건과 반영 시점이 확인됐습니다.'],
+  ['fund', 'different', '아니요, 아직 확정되지 않았습니다.'],
+  ['fund', 'unknown', '확인할 수 없습니다.'],
+  ['action', 'same', '예, 같은 ETF와 기간입니다.'],
+  ['action', 'different', '아니요, 상품이나 적용 기간이 다릅니다.'],
+  ['action', 'unknown', '확인할 수 없습니다.'],
 ] as const)
   test(`실제 ${kind} ${choice} 응답은 기존 검토 상태만 바꾸고 오류를 확정하지 않는다`, async ({ page }) => {
     const panel = await inspect(page),
@@ -96,7 +96,7 @@ for (const [kind, choice, label, response] of [
     await page.getByRole('region', { name: '선택 항목 상세 검토', exact: true }).getByLabel(label, { exact: true }).check();
     await expect(panel.locator('.compound-feedback')).toHaveCount(0);
     await page.getByRole('region', { name: '선택 항목 상세 검토', exact: true }).getByRole('button', { name: '답변 저장' }).click();
-    await expect(panel.locator('.compound-feedback')).toContainText(response);
+    await expect(panel.locator('.compound-feedback')).toContainText(label);
     await expect(panel.locator('.compound-feedback')).toBeInViewport();
     await expect(panel).toContainText('확인된 오류 0');
     await expect(panel.locator(`.finding[data-review-kind="${kind}"]`)).toHaveCount(1);

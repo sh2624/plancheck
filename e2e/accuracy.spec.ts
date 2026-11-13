@@ -174,7 +174,7 @@ for (const kind of ['CALC', 'FUND', 'ACTION', 'ALLOC'] as const) {
       await detail.getByLabel('아니요, 구성이 다르거나 빠진 항목이 있습니다.', { exact: true }).check();
       await detail.getByRole('button', { name: '답변 저장' }).click();
       await expect(panel).toContainText('확인된 오류 0');
-      await expect(panel.getByRole('status')).toContainText('구성 수정이 필요');
+      await expect(panel.getByRole('status')).toContainText('구성이 다르거나 빠진 항목');
     }
   });
 }

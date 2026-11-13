@@ -4,12 +4,12 @@ import type { Recommendation } from '../recommendations/types';
 import type { Candidate } from '../normalization/types';
 import type { Result } from '../validation/types';
 import type { ReviewChoice, InlineAnswers } from '../inspection/review';
-import { inlineRequirements } from '../inspection/review';
 import { groupFindings, findingSection, findingType, resultSections, type ReviewedFinding } from '../presentation/findingGroups';
 import { formatFinancial } from '../presentation/format';
 import { groupDiscoveries } from '../presentation/discoveries';
 import { compoundReview, readableBasis } from '../presentation/compoundReview';
-import { comparisonFormat, comparisonReviewStatus } from '../presentation/comparison';
+import { comparisonFormat } from '../presentation/comparison';
+import { reviewCompletion } from '../presentation/reviewCompletion';
 import { candidateValue } from '../presentation/workflow';
 import { RecommendationDetail } from './RecommendationCenter';
 import { InlineReview } from './InlineReview';
@@ -42,19 +42,6 @@ type Props = InspectionInput & {
   onPlanReview?: (finding: ReviewedFinding, choice: ReviewChoice) => void;
 };
 function explanation(f: ReviewedFinding) {
-  if (!f.approved && f.decision?.reviewOnly && f.decision.choice === 'same') {
-    const need = inlineRequirements(f.result.evidence);
-    const remaining = [
-      need.asOf || need.scenario ? '비교 기준' : '',
-      need.period ? '적용 기간' : '',
-      need.units.length ? '단위' : '',
-      need.certainty ? '확정 여부' : '',
-    ].filter(Boolean);
-    return `같은 기준이라는 답변을 저장했습니다. ${remaining.length ? `${remaining.join('·')}는 상세 검토에서 확인하세요.` : '최종 승인은 상세 검토에서 별도로 진행합니다.'}`;
-  }
-  if (f.decision?.choice === 'different')
-    return '다른 조건의 값으로 분류했습니다. 원래 수치 차이는 유지하며 확정 오류로 비교하지 않습니다.';
-  if (f.decision?.choice === 'unknown') return '원본 조건을 확인할 수 없어 보류했습니다. 원래 수치 차이와 근거는 유지합니다.';
   if (f.approved?.status === '오류')
     return '사용자가 확인한 관계와 적용 조건에서 차이가 검출됐습니다. 원본을 대조해 수정할 내용을 확인하세요.';
   if (f.approved?.status === '검증 통과') return '확인한 항목과 검사 범위에서 통과했습니다. 다른 범위의 정상 여부까지 뜻하지 않습니다.';
@@ -120,6 +107,7 @@ export function InspectionResults(props: Props) {
     ? (compoundReview(reviewed, props.planning, props.references) ?? calculationPrompt(reviewed))
     : undefined;
   const reviewedChoice = reviewed?.decision?.choice;
+  const completedReview = reviewed ? reviewCompletion(reviewed, reviewedSummary?.choices) : undefined;
   useEffect(() => {
     if (!selected && feedbackPending.current && lastReviewed && reviewedChoice) {
       feedbackPending.current = false;
@@ -168,6 +156,10 @@ export function InspectionResults(props: Props) {
     const inlineCompound = !!reviewPrompt && !!props.onPlanReview && !complex;
     const reviewFinding = comparison ?? f;
     const decision = f.decision ?? comparison?.decision;
+    const completion = reviewCompletion(
+      { ...(f.decision ? f : reviewFinding), decision, approved: f.approved ?? reviewFinding.approved },
+      reviewPrompt?.choices ?? (f.decision ? calculationPrompt(f)?.choices : undefined),
+    );
     const formatted = comparisonFormat(valueEvidence, r.unit);
     const displayTitle =
       r.unit === '원' && r.difference !== null
@@ -175,23 +167,8 @@ export function InspectionResults(props: Props) {
         : f.title;
     const proofEvidence = [...new Map([...r.evidence, ...(comparison?.result.evidence ?? [])].map((c) => [c.id, c])).values()];
     const status =
-      !f.approved && reviewPrompt && f.decision
-        ? f.decision.choice === 'same'
-          ? '답변 기록 · 확인 필요'
-          : summary?.kind === 'fund' && f.decision.choice === 'different'
-            ? '미확정 답변 · 추가 확인'
-            : '답변 보류 · 확인 필요'
-        : !f.approved && decision?.reviewOnly && decision.choice === 'same'
-          ? comparisonReviewStatus(reviewFinding)
-          : f.decision?.choice === 'different'
-            ? '비교 기준 다름 · 추가 정보 필요'
-            : f.decision?.choice === 'unknown'
-              ? '비교 기준 확인 필요'
-              : f.approved
-                ? statusLabels[f.approved.status]
-                : section === resultSections[3]
-                  ? '추가 정보 필요'
-                  : '검사 중 발견 · 확인 필요';
+      completion?.status ??
+      (f.approved ? statusLabels[f.approved.status] : section === resultSections[3] ? '추가 정보 필요' : '검사 중 발견 · 확인 필요');
     return (
       <article
         className={detailed ? 'finding-support py-4 border-t' : 'finding'}
@@ -286,19 +263,15 @@ export function InspectionResults(props: Props) {
           </p>
         )}
         <p className="finding-description">
-          {summary
-            ? summary.meaning
-            : !f.approved && decision?.reviewOnly && decision.choice === 'same'
-              ? explanation(reviewFinding)
+          {completion
+            ? completion.answer
+            : summary
+              ? summary.meaning
               : !f.decision && !f.approved && (f.relationship?.blocked || contextMismatch(f))
                 ? entry.reasons[0]
                 : explanation(f)}
         </p>
-        {summary && selected !== f.id && (
-          <p className="finding-question">
-            {f.decision?.choice === 'same' ? '관계 답변을 기록했습니다. 최종 판정에 필요한 조건을 확인하세요.' : summary.question}
-          </p>
-        )}
+        {summary && !decision && selected !== f.id && <p className="finding-question">{summary.question}</p>}
         {selected !== f.id && (
           <div className="finding-actions">
             <Button
@@ -314,7 +287,7 @@ export function InspectionResults(props: Props) {
                 } else props.onPrepare(r);
               }}
             >
-              {f.relationship?.blocked ? '문서 내용 확인·수정' : f.approved ? '확인 내용 수정' : '이 항목 검토'}
+              {f.relationship?.blocked ? '문서 내용 확인·수정' : f.approved ? '확인 내용 수정' : decision ? '답변 수정' : '이 항목 검토'}
             </Button>
           </div>
         )}
@@ -490,7 +463,10 @@ export function InspectionResults(props: Props) {
       {reviewed && reviewed.decision && (
         <aside ref={feedbackRef} tabIndex={-1} className="compound-feedback" role="status">
           <strong>{reviewedSummary?.title ?? reviewed.title}</strong>
-          <p>{reviewedSummary && !reviewed.approved ? reviewedSummary.responses[reviewed.decision.choice] : explanation(reviewed)}</p>
+          <p>{completedReview?.answer}</p>
+          <p>
+            {completedReview?.conclusion} {completedReview?.next}
+          </p>
           <Button
             variant="outline"
             onClick={() => {
@@ -545,7 +521,7 @@ export function InspectionResults(props: Props) {
         <h2>
           우선 확인할 문제 <span>{tierEntries(qualityTiers[0]).length}개</span>
         </h2>
-        <p className="quality-caption">값과 원본을 대조하고 ‘이 항목 검토’에서 같은 기준인지 확인하세요.</p>
+        <p className="quality-caption">답변을 저장하면 일반 검토가 완료됩니다. 최종 오류 판정은 별도입니다.</p>
         {!tierEntries(qualityTiers[0]).length && (
           <p className="section-empty">
             우선 검토할 독립 발견이 없습니다. 추가 검토와 상세 분석 기록을 확인하세요. 정상 판정이라는 뜻은 아닙니다.

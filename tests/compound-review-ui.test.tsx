@@ -73,7 +73,9 @@ for (const kind of ['allocation', 'fund', 'action'] as const)
       expect(onPlanReview).not.toHaveBeenCalled();
       fireEvent.click(screen.getByRole('button', { name: '답변 저장' }));
       expect(onPlanReview).toHaveBeenCalledWith(initial, choice);
-      expect(screen.getByRole('status').textContent).toContain(summary.responses[choice]);
+      expect(screen.getByRole('status').textContent).toContain(summary.choices[choice]);
+      expect(screen.getByRole('status').textContent).toContain('추가 입력 없이 일반 검토를 마칠 수 있습니다.');
+      expect(document.querySelector('.finding-question')).toBeNull();
       expect(screen.getByText('확인된 오류 0')).toBeTruthy();
       expect(onApply).not.toHaveBeenCalled();
       expect(onEdit).not.toHaveBeenCalled();
