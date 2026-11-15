@@ -9,5 +9,7 @@ test('실제 월·연 소득을 같은 기간의 값처럼 표시하지 않는�
   const results = page.getByRole('region', { name: '자동 검사 결과' });
   await expect(results).toBeVisible();
   await expect(results.locator('.quality-priority')).not.toContainText('7,700만 원');
+  await expect(results.locator('.quality-priority')).not.toContainText('310만 원 다릅니다');
+  await expect(results.locator('.quality-priority')).not.toContainText('390만 원 다릅니다');
   await expect(results).toContainText('확인된 오류 0');
 });

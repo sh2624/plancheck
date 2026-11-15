@@ -12,6 +12,17 @@ const period = (s: string) =>
   ['월', '월간', '매월'].includes(compact(s)) ? '월간' : ['연', '연간', '매년'].includes(compact(s)) ? '연간' : compact(s);
 export const specificDate = (s: string) => /\d{4}/.test(s) && /[-./년]/.test(s);
 const savingsRow = (c: Candidate) => /^저축\s*[·/ㆍ-]?\s*투자/.test(c.label) || /^\s*저축\s*[·/ㆍ-]?\s*투자\s*[|·:]/.test(c.originalText);
+/** 괄호 안의 구성 설명을 소득 주체로 오인하지 않고 명시된 개인·가구 범위만 구분한다. */
+function incomeScope(c: Candidate) {
+  const label = c.label.replace(/[（(][^）)]*[）)]/g, '');
+  if (/부부|가구|가계|합산/.test(label)) return '합산';
+  if (/남편/.test(label)) return '남편';
+  if (/아내/.test(label)) return '아내';
+  if (/본인/.test(label)) return '본인';
+  if (/배우자/.test(label)) return '배우자';
+  if (/합계|총소득|총수입|총유입/.test(label)) return '합산';
+  return '';
+}
 function atoms(c: Candidate) {
   const labels: [string, RegExp][] = ['fixedExpense', 'variableExpense'].includes(c.field)
     ? [
@@ -46,6 +57,10 @@ export function assessRelationship(a: Candidate, b: Candidate): RelationshipAsse
     x = atoms(a),
     y = atoms(b);
   if (a.field === 'income') {
+    const aScope = incomeScope(a),
+      bScope = incomeScope(b);
+    if (aScope && bScope && aScope !== bScope)
+      reasons.push('소득의 대상 또는 개인·합산 범위가 다릅니다. 동일 항목으로 자동 연결하지 않습니다.');
     const kind = (c: Candidate) =>
       /총유입/.test(c.label) ? '총유입' : /기타소득/.test(c.label) ? '기타소득' : /근로소득/.test(c.label) ? '근로소득' : '';
     if (kind(a) && kind(b) && kind(a) !== kind(b)) reasons.push('소득 세부 항목과 총유입의 범위가 다릅니다.');
