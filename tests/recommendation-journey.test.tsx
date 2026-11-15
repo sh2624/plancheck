@@ -20,8 +20,8 @@ it.skipIf(!process.env.PLANCHECK_XLSX || !process.env.PLANCHECK_DOCX)(
     fireEvent.change(screen.getByLabelText(/검토할 Word/), {
       target: { files: [file(process.env.PLANCHECK_DOCX!, 'report.docx')] },
     });
-    await screen.findByText('원본: financial.xlsx', {}, { timeout: 5000 });
-    await screen.findByText(/원본: report.docx/, {}, { timeout: 5000 });
+    await within(screen.getByRole('region', { name: 'Excel 재무표' })).findByText('등록 완료 · 추출됨', {}, { timeout: 5000 });
+    await within(screen.getByRole('region', { name: 'Word 보고서' })).findByText('등록 완료 · 추출됨', {}, { timeout: 5000 });
     openAdvancedResults();
     expect(screen.queryByText('오류', { selector: 'span', exact: true })).toBeNull();
     fireEvent.change(screen.getByLabelText('추천 종류'), {

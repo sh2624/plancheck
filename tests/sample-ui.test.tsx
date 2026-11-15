@@ -20,8 +20,8 @@ it.skipIf(!process.env.PLANCHECK_XLSX || !process.env.PLANCHECK_DOCX)(
       target: { files: [fixture(process.env.PLANCHECK_DOCX!, 'sample.docx')] },
     });
     // 실제 ZIP/XML 처리 시간은 병렬 테스트의 CPU 부하에 따라 달라진다.
-    await screen.findByText('원본: sample.xlsx', {}, { timeout: 5000 });
-    await screen.findByText(/원본: sample.docx/, {}, { timeout: 5000 });
+    await within(screen.getByRole('region', { name: 'Excel 재무표' })).findByText('등록 완료 · 추출됨', {}, { timeout: 5000 });
+    await within(screen.getByRole('region', { name: 'Word 보고서' })).findByText('등록 완료 · 추출됨', {}, { timeout: 5000 });
     fireEvent.click(screen.getByText('추출 요약·원본 보기 · Excel 재무표'));
     fireEvent.click(screen.getByText('추출 요약·원본 보기 · Word 보고서'));
     fireEvent.click(screen.getByText('원본 상세 보기 · Excel 재무표'));
