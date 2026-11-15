@@ -175,12 +175,22 @@ export function extractWorkbook(book: Workbook): Candidate[] {
       const values = firstNumeric < 0 ? [] : cells.slice(firstNumeric).filter((c) => numeric.test(c.value.trim()) || c.formula);
       let emitted = false;
       for (const c of values) {
+        // 한 행에 항목·값 쌍이 반복되면 직전 숫자 이후의 항목명을 사용한다.
+        const index = cells.indexOf(c);
+        const previous = cells.slice(0, index).findLastIndex((cell) => numeric.test(cell.value.trim()) || !!cell.formula);
+        const localLabel = cells
+          .slice(previous + 1, index)
+          .filter((cell) => cell.value.trim() && !temporalCell(cell))
+          .map((cell) => cell.value)
+          .join(' · ');
+        const itemLabel = previous >= 0 && classify(localLabel) ? localLabel : label;
+        const itemField = previous >= 0 && classify(localLabel) ? classify(localLabel) : field;
         const header = headers.get(column(c.address)) ?? '';
         if (/대비|비율|비중|비고|상태|확정|기준일|일자|날짜/.test(header) || temporalCell(c)) continue;
         const roleHeader = /잔액|보유액|납입액|이체액|적립액|지출액|사용액/.test(header);
-        const valueField = roleHeader && field ? classify(`${label} ${header}`) : (field ?? classify(header));
+        const valueField = roleHeader && itemField ? classify(`${itemLabel} ${header}`) : (itemField ?? classify(header));
         if (!valueField) continue;
-        const valueLabel = field && !roleHeader ? label : `${label} · ${roleHeader ? headerName(header) : header}`;
+        const valueLabel = itemField && !roleHeader ? itemLabel : `${itemLabel} · ${roleHeader ? headerName(header) : header}`;
         const isPercent = !!c.numberFormat?.includes('%');
         if (isPercent && valueField !== 'loanRate') continue;
         const labelUnit = unitOf(valueLabel.match(/[（(]\s*(억\s*원|만\s*원|원|%|개월|년)\s*[）)]/)?.[1] ?? '');

@@ -33,7 +33,7 @@ export function periodOf(header: string, label: string, flow: boolean) {
   const h = headerName(header);
   if (header.match(/\d{4}/)) return header.match(/\d{4}/)![0];
   if (/^(연|연간|연별)/.test(h) || /[（(]\s*연(?:간)?\s*[）)]/.test(header)) return '연간';
-  if (flow && /연간|연\s*(?:소득|수입|지출|저축|원리금)/.test(label)) return '연간';
+  if (flow && /연간|연봉|연\s*(?:실수령|소득|수입|지출|저축|원리금)/.test(label)) return '연간';
   if (/^(월|월간|매월)/.test(h) || /[（(]\s*월(?:간)?\s*[）)]/.test(header) || (flow && /월|고정지출|변동지출|저축·투자/.test(label)))
     return '월간';
   return h.match(/\d{4}/)?.[0] ?? '';
