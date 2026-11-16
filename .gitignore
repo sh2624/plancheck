@@ -46,3 +46,12 @@ coverage/
 /test-results/
 /playwright-report/
 .vercel/
+
+# Additional local credentials and temporary files
+.aws/
+.pnpm-store/
+.vite/
+.eslintcache
+*.tmp
+*.bak
+/tmp/

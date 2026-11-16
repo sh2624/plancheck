@@ -1,5 +1,4 @@
 {
   "buildCommand": "npm run build",
-  "outputDirectory": "dist",
-  "functions": { "api/analyze-context.ts": { "maxDuration": 20 } }
+  "outputDirectory": "dist"
 }

@@ -1,5 +1,7 @@
 # 팀원 피드백 반영본 — 2026-11-12
 
+> 과거 개발·검증 기록입니다. 공모전 종료 후 AI 실험 코드와 API는 제거했으며 현재 버전에는 포함되지 않습니다.
+
 ## 전달할 버전과 현재 배포 상태
 
 - 검증한 소스 커밋: `32ca7f1` / 로컬 태그 `team-feedback-ready-20261112`.
@@ -63,7 +65,7 @@ git push origin main
 Vercel에서 방금 올린 커밋의 Production 배포가 Ready인지 확인한다. 후속 보고서 커밋이 있더라도 앱 소스는 위 검증 소스와 동일하다. Git 자동 배포 대신 CLI가 필요한 경우 사용자 본인이 다음을 실행할 수 있다.
 
 ```powershell
-npx.cmd vercel deploy --environment=production --build-env VITE_ENABLE_AI_CONTEXT=false --env PLANCHECK_AI_ENABLED=false
+npx.cmd vercel deploy --environment=production
 ```
 
 사용자가 실제 Production 배포를 완료한 뒤 수행할 최종 재검증:
